@@ -3,74 +3,19 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import GUI from 'lil-gui';
 
 const canvas = document.getElementById('space-canvas');
-const captureStatus = document.getElementById('capture-status');
-const flash = document.getElementById('flash');
+const flashEl = document.getElementById('flash');
+const captureStatusEl = document.getElementById('capture-status');
+const phonePreviewEl = document.getElementById('phone-preview');
 
-const PLANET_RADIUS = 1.85;
+const btnToggleUI = document.getElementById('btn-toggle-ui');
+const btnExport4K = document.getElementById('btn-export-4k');
+const btnExportVertical = document.getElementById('btn-export-vertical');
+const btnExportSquare = document.getElementById('btn-export-square');
+const btnExportIphone = document.getElementById('btn-export-iphone');
+const btnExportFree = document.getElementById('btn-export-free');
+const btnReset = document.getElementById('btn-reset');
 
-const params = {
-  // UI / cena
-  showUI: true,
-  autoRotate: false,
-  autoRotateSpeed: 0.04,
-
-  // Modo câmera
-  cameraProfile: 'Cassini Natural',
-  sensorGrain: 0.014,
-  cameraVignette: 0.20,
-  cameraBloom: 0.025,
-  cameraMono: false,
-  mobileWallpaperMode: false,
-
-  // Câmera / composição
-  cameraFov: 24,
-  cameraDistance: 16.8,
-  cameraOffsetX: 0.0,
-  cameraOffsetY: 0.2,
-
-  // Saturno
-  frameRotationZ: -8,
-  planetSpinSpeed: 0.0,
-  polarFlattening: 0.902,
-  planetBrightness: 1.0,
-  bumpScale: 0.003,
-  cloudOpacity: 0.09,
-  cloudSpeed: 0.0,
-  showHexagonHint: true,
-
-  // Luz
-lightX: 8.5,
-lightY: 4.0,
-lightZ: 10.5,
-lightIntensity: 2.55,
-ambientIntensity: 0.0,
-
-  // Atmosfera / rim scattering
-  atmosphereGlow: 0.34,
-  atmospherePower: 2.7,
-  atmosphereScale: 1.025,
-
-  // Sombra dos anéis na atmosfera
-  ringShadowStrength: 0.34,
-  ringShadowSoftness: 0.72,
-
-  // Anéis
-  ringTilt: 73.5,
-  ringOpacity: 0.97,
-  ringBrightness: 1.0,
-  ringChaos: 0.52,
-  ringSpiralWaves: 0.38,
-  ringInnerRadius: 2.24,
-  ringOuterRadius: 4.95,
-
-  // Fundo
-  starCount: 65,
-  starBrightness: 0.055,
-  starSize: 0.028,
-
-  // Render
-  rendererExposure: 0.96
-};
+const PLANET_RADIUS = 5.25;
 
 let scene;
 let camera;
@@ -79,16 +24,250 @@ let controls;
 let gui;
 let clock;
 
-let sunLight;
-let ambientLight;
-
 let saturnGroup;
+let ringGroup;
 let planetMesh;
 let cloudMesh;
 let atmosphereMesh;
-let ringGroup;
 let ringMesh;
-let stars;
+let starField;
+
+let sunLight;
+let ambientLight;
+
+let guiControllers = [];
+
+const params = {
+  sceneProfile: 'Missão Cassini',
+  captureProfile: 'Missão Cassini',
+  phoneOrientation: 'Vertical',
+  showPhoneFrame: false,
+  keepPhoneGuideInFreeMode: false,
+
+  // Composição
+  fov: 24,
+  distance: 16.8,
+  offsetX: 0.0,
+  offsetY: 0.2,
+  frameRotationZ: -8,
+  subjectScale: 1.0,
+
+  // Modo câmera
+  sensorNoise: 0.014,
+  vignette: 0.20,
+  bloomMin: 0.025,
+  iphoneEarthRealism: 0.90,
+
+  // Saturno
+  polarFlattening: 0.902,
+  planetBrightness: 1.05,
+  bandVisibility: 0.62,
+  terminatorSoftness: 0.42,
+  cloudOpacity: 0.08,
+  cloudSpeed: 0.01,
+  planetSpinSpeed: 0.006,
+  showHexagonHint: true,
+  hexagonStrength: 0.10,
+
+  // Atmosfera
+  atmosphereGlow: 0.24,
+  atmospherePower: 3.2,
+  atmosphereScale: 1.025,
+  limbIrregularity: 0.16,
+
+  // Sombra dos anéis
+  physicalRingShadow: 0.62,
+  ringShadowSharpness: 0.78,
+
+  // Anéis
+  ringInnerRadius: 7.15,
+  ringOuterRadius: 11.65,
+  ringTilt: 73.5,
+  ringOpacity: 0.84,
+  ringBrightness: 0.88,
+  ringMacroChaos: 0.74,
+  ringClumpStrength: 0.48,
+  ringRadialChaos: 0.62,
+  ringSpiralWaves: 0.55,
+
+  // Luz
+  lightX: 5.8,
+  lightY: 4.2,
+  lightZ: 15.5,
+  lightIntensity: 3.1,
+  ambientIntensity: 0.0,
+
+  // Render
+  exposure: 1.04,
+  starCount: 35,
+  starSize: 0.028,
+  showStars: true,
+
+  // Captura livre
+  freeWidth: 3000,
+  freeHeight: 3000
+};
+
+const PROFILE_PRESETS = {
+  'Missão Cassini': {
+    showPhoneFrame: false,
+    phoneOrientation: 'Vertical',
+
+    fov: 24,
+    distance: 16.8,
+    offsetX: 0.0,
+    offsetY: 0.2,
+    frameRotationZ: -8,
+    subjectScale: 1.0,
+
+    sensorNoise: 0.014,
+    vignette: 0.20,
+    bloomMin: 0.025,
+
+    polarFlattening: 0.902,
+    planetBrightness: 1.05,
+    bandVisibility: 0.62,
+    terminatorSoftness: 0.42,
+    cloudOpacity: 0.08,
+    cloudSpeed: 0.01,
+    planetSpinSpeed: 0.006,
+    showHexagonHint: true,
+    hexagonStrength: 0.10,
+
+    atmosphereGlow: 0.24,
+    atmospherePower: 3.2,
+    atmosphereScale: 1.025,
+    limbIrregularity: 0.16,
+
+    physicalRingShadow: 0.62,
+    ringShadowSharpness: 0.78,
+
+    ringTilt: 73.5,
+    ringOpacity: 0.84,
+    ringBrightness: 0.88,
+    ringMacroChaos: 0.74,
+    ringClumpStrength: 0.48,
+    ringRadialChaos: 0.62,
+    ringSpiralWaves: 0.55,
+
+    lightX: 5.8,
+    lightY: 4.2,
+    lightZ: 15.5,
+    lightIntensity: 3.1,
+    ambientIntensity: 0.0,
+
+    exposure: 1.04,
+    starCount: 35,
+    starSize: 0.028,
+    showStars: true
+  },
+
+  'iPhone 17 Pro Max da Terra': {
+    showPhoneFrame: true,
+    phoneOrientation: 'Vertical',
+
+    fov: 12,
+    distance: 95,
+    offsetX: 0,
+    offsetY: 0,
+    frameRotationZ: 0,
+    subjectScale: 0.085,
+
+    sensorNoise: 0.050,
+    vignette: 0.32,
+    bloomMin: 0.055,
+
+    polarFlattening: 0.902,
+    planetBrightness: 1.00,
+    bandVisibility: 0.35,
+    terminatorSoftness: 0.20,
+    cloudOpacity: 0.04,
+    cloudSpeed: 0.0,
+    planetSpinSpeed: 0.001,
+    showHexagonHint: false,
+    hexagonStrength: 0.0,
+
+    atmosphereGlow: 0.08,
+    atmospherePower: 3.8,
+    atmosphereScale: 1.015,
+    limbIrregularity: 0.05,
+
+    physicalRingShadow: 0.35,
+    ringShadowSharpness: 0.72,
+
+    ringTilt: 74.0,
+    ringOpacity: 0.88,
+    ringBrightness: 0.96,
+    ringMacroChaos: 0.42,
+    ringClumpStrength: 0.20,
+    ringRadialChaos: 0.24,
+    ringSpiralWaves: 0.18,
+
+    lightX: 8.0,
+    lightY: 2.5,
+    lightZ: 15.0,
+    lightIntensity: 2.2,
+    ambientIntensity: 0.0,
+
+    exposure: 0.92,
+    starCount: 18,
+    starSize: 0.018,
+    showStars: true
+  },
+
+  'Modo Livre': {
+    showPhoneFrame: false,
+    phoneOrientation: 'Vertical',
+
+    fov: 26,
+    distance: 18,
+    offsetX: 0,
+    offsetY: 0,
+    frameRotationZ: -4,
+    subjectScale: 1.0,
+
+    sensorNoise: 0.012,
+    vignette: 0.16,
+    bloomMin: 0.020,
+
+    polarFlattening: 0.902,
+    planetBrightness: 1.08,
+    bandVisibility: 0.70,
+    terminatorSoftness: 0.36,
+    cloudOpacity: 0.09,
+    cloudSpeed: 0.01,
+    planetSpinSpeed: 0.006,
+    showHexagonHint: true,
+    hexagonStrength: 0.08,
+
+    atmosphereGlow: 0.26,
+    atmospherePower: 3.0,
+    atmosphereScale: 1.025,
+    limbIrregularity: 0.14,
+
+    physicalRingShadow: 0.54,
+    ringShadowSharpness: 0.72,
+
+    ringTilt: 72.5,
+    ringOpacity: 0.86,
+    ringBrightness: 0.92,
+    ringMacroChaos: 0.68,
+    ringClumpStrength: 0.40,
+    ringRadialChaos: 0.50,
+    ringSpiralWaves: 0.48,
+
+    lightX: 6.4,
+    lightY: 4.0,
+    lightZ: 13.2,
+    lightIntensity: 3.0,
+    ambientIntensity: 0.0,
+
+    exposure: 1.03,
+    starCount: 45,
+    starSize: 0.028,
+    showStars: true
+  }
+};
 
 init();
 animate();
@@ -96,114 +275,502 @@ animate();
 function init() {
   clock = new THREE.Clock();
 
-  createRenderer();
-  createScene();
-  createCamera();
-  createLights();
-  createSaturnSystem();
-  createStars();
-  createControls();
-  createGui();
-  bindButtons();
-  bindKeyboard();
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
 
-  window.addEventListener('resize', onResize);
+  camera = new THREE.PerspectiveCamera(
+    params.fov,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    2000
+  );
 
-  updateScene();
-  onResize();
-}
-
-function createRenderer() {
   renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
     alpha: false,
-    preserveDrawingBuffer: true
+    powerPreference: 'high-performance'
   });
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  renderer.setClearColor(0x000000, 1);
+  renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = params.rendererExposure;
-}
+  renderer.toneMappingExposure = params.exposure;
 
-function createScene() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
-}
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+  controls.minDistance = 6;
+  controls.maxDistance = 220;
 
-function createCamera() {
-  camera = new THREE.PerspectiveCamera(
-    params.cameraFov,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    5000
-  );
+  saturnGroup = new THREE.Group();
+  ringGroup = new THREE.Group();
+  saturnGroup.add(ringGroup);
+  scene.add(saturnGroup);
 
-  updateCameraPosition();
-}
-
-function createLights() {
   ambientLight = new THREE.AmbientLight(0xffffff, params.ambientIntensity);
   scene.add(ambientLight);
 
   sunLight = new THREE.DirectionalLight(0xffffff, params.lightIntensity);
-  sunLight.position.set(params.lightX, params.lightY, params.lightZ);
   scene.add(sunLight);
-}
-
-function createSaturnSystem() {
-  saturnGroup = new THREE.Group();
-  saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.frameRotationZ);
-  scene.add(saturnGroup);
 
   createPlanet();
   createCloudLayer();
   createAtmosphereGlow();
-  createRings();
+  buildRingMesh();
+  createStars();
+
+  createGui();
+  bindHud();
+  applySceneProfile('Missão Cassini');
+  updateScene();
+
+  window.addEventListener('resize', onWindowResize);
+  window.addEventListener('keydown', onKeyDown);
+}
+
+function createGui() {
+  gui = new GUI({ title: 'SATURN MODE' });
+
+  const actions = {
+    'Aplicar perfil': () => applySceneProfile(params.sceneProfile),
+    'Capturar 3840x2160': () => capturePreset('4k'),
+    'Capturar 2160x3840': () => capturePreset('vertical4k'),
+    'Capturar 4096x4096': () => capturePreset('square4096'),
+    'Capturar iPhone 17 PM': () => capturePreset('iphone17pm'),
+    'Capturar Livre': () => captureFree()
+  };
+
+  const folderMode = gui.addFolder('Modo');
+  track(folderMode.add(params, 'sceneProfile', [
+    'Missão Cassini',
+    'iPhone 17 Pro Max da Terra',
+    'Modo Livre'
+  ]).name('Perfil').onChange((value) => applySceneProfile(value)));
+  track(folderMode.add(params, 'showPhoneFrame').name('Mostrar guia celular').onChange(updatePhonePreview));
+  track(folderMode.add(params, 'phoneOrientation', ['Vertical', 'Horizontal']).name('Orientação celular').onChange(updatePhonePreview));
+  track(folderMode.add(actions, 'Aplicar perfil'));
+
+  const folderComp = gui.addFolder('Composição');
+  track(folderComp.add(params, 'fov', 5, 60, 0.1).name('FOV').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'distance', 6, 220, 0.1).name('Distância').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'offsetX', -20, 20, 0.01).name('Offset X').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'offsetY', -20, 20, 0.01).name('Offset Y').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'frameRotationZ', -180, 180, 0.1).name('Rotação quadro').onChange(updateScene));
+  track(folderComp.add(params, 'subjectScale', 0.02, 3.0, 0.001).name('Escala assunto').onChange(updateScene));
+
+  const folderSaturn = gui.addFolder('Saturno');
+  track(folderSaturn.add(params, 'polarFlattening', 0.82, 1.0, 0.001).name('Achatamento polar').onChange(updateScene));
+  track(folderSaturn.add(params, 'planetBrightness', 0.2, 2.0, 0.01).name('Brilho').onChange(updateScene));
+  track(folderSaturn.add(params, 'bandVisibility', 0, 1.5, 0.01).name('Bandas visíveis').onChange(updateScene));
+  track(folderSaturn.add(params, 'terminatorSoftness', 0.02, 1.0, 0.01).name('Suavidade terminador').onChange(updateScene));
+  track(folderSaturn.add(params, 'cloudOpacity', 0, 0.4, 0.01).name('Opac. nuvens').onChange(updateScene));
+  track(folderSaturn.add(params, 'cloudSpeed', 0, 0.08, 0.001).name('Rot. nuvens').onChange(updateScene));
+  track(folderSaturn.add(params, 'planetSpinSpeed', 0, 0.05, 0.001).name('Rot. planeta').onChange(updateScene));
+  track(folderSaturn.add(params, 'showHexagonHint').name('Hexágono polar').onChange(() => rebuildPlanetMaps()));
+  track(folderSaturn.add(params, 'hexagonStrength', 0, 0.35, 0.01).name('Força hexágono').onChange(() => rebuildPlanetMaps()));
+
+  const folderAtmosphere = gui.addFolder('Atmosfera');
+  track(folderAtmosphere.add(params, 'atmosphereGlow', 0, 1.0, 0.01).name('Rim glow').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'atmospherePower', 1.0, 6.0, 0.01).name('Queda glow').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'atmosphereScale', 1.0, 1.08, 0.001).name('Escala atmosfera').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'limbIrregularity', 0, 0.5, 0.01).name('Irregularidade limbo').onChange(updateScene));
+
+  const folderShadow = gui.addFolder('Sombra dos Anéis');
+  track(folderShadow.add(params, 'physicalRingShadow', 0, 1.2, 0.01).name('Sombra física').onChange(updateScene));
+  track(folderShadow.add(params, 'ringShadowSharpness', 0.05, 1.5, 0.01).name('Nitidez física').onChange(updateScene));
+
+  const folderRings = gui.addFolder('Anéis');
+  track(folderRings.add(params, 'ringTilt', 0, 89, 0.1).name('Inclinação').onChange(updateScene));
+  track(folderRings.add(params, 'ringOpacity', 0, 1.0, 0.01).name('Opacidade').onChange(updateScene));
+  track(folderRings.add(params, 'ringBrightness', 0.2, 1.5, 0.01).name('Brilho').onChange(updateScene));
+  track(folderRings.add(params, 'ringMacroChaos', 0, 1.5, 0.01).name('Caos macro').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringClumpStrength', 0, 1.0, 0.01).name('Aglomerados').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringRadialChaos', 0, 1.0, 0.01).name('Caos radial').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringSpiralWaves', 0, 1.0, 0.01).name('Ondas').onFinishChange(buildRingMesh));
+
+  const folderLight = gui.addFolder('Luz');
+  track(folderLight.add(params, 'lightX', -50, 50, 0.1).name('Luz X').onChange(updateScene));
+  track(folderLight.add(params, 'lightY', -50, 50, 0.1).name('Luz Y').onChange(updateScene));
+  track(folderLight.add(params, 'lightZ', -50, 50, 0.1).name('Luz Z').onChange(updateScene));
+  track(folderLight.add(params, 'lightIntensity', 0, 8.0, 0.01).name('Intensidade').onChange(updateScene));
+  track(folderLight.add(params, 'ambientIntensity', 0, 1.0, 0.001).name('Luz ambiente').onChange(updateScene));
+
+  const folderRender = gui.addFolder('Render');
+  track(folderRender.add(params, 'exposure', 0.2, 2.4, 0.01).name('Exposição').onChange(updateScene));
+  track(folderRender.add(params, 'sensorNoise', 0, 0.20, 0.001).name('Ruído sensor').onChange(updateScene));
+  track(folderRender.add(params, 'vignette', 0, 1.0, 0.01).name('Vinheta').onChange(updateScene));
+  track(folderRender.add(params, 'bloomMin', 0, 0.25, 0.001).name('Bloom mínimo').onChange(updateScene));
+  track(folderRender.add(params, 'showStars').name('Mostrar estrelas').onChange(updateScene));
+  track(folderRender.add(params, 'starCount', 0, 1000, 1).name('Qtd estrelas').onFinishChange(createStars));
+  track(folderRender.add(params, 'starSize', 0.002, 0.08, 0.001).name('Tam. estrelas').onFinishChange(createStars));
+
+  const folderCapture = gui.addFolder('Captura Livre');
+  track(folderCapture.add(params, 'freeWidth', 320, 10000, 1).name('Largura'));
+  track(folderCapture.add(params, 'freeHeight', 320, 10000, 1).name('Altura'));
+
+  const folderActions = gui.addFolder('Ações');
+  track(folderActions.add(actions, 'Capturar 3840x2160'));
+  track(folderActions.add(actions, 'Capturar 2160x3840'));
+  track(folderActions.add(actions, 'Capturar 4096x4096'));
+  track(folderActions.add(actions, 'Capturar iPhone 17 PM'));
+  track(folderActions.add(actions, 'Capturar Livre'));
+}
+
+function bindHud() {
+  btnToggleUI.addEventListener('click', toggleUI);
+
+  btnExport4K.addEventListener('click', () => capturePreset('4k'));
+  btnExportVertical.addEventListener('click', () => capturePreset('vertical4k'));
+  btnExportSquare.addEventListener('click', () => capturePreset('square4096'));
+  btnExportIphone.addEventListener('click', () => capturePreset('iphone17pm'));
+  btnExportFree.addEventListener('click', captureFree);
+
+  btnReset.addEventListener('click', () => {
+    applySceneProfile(params.sceneProfile || 'Missão Cassini');
+  });
+}
+
+function onKeyDown(event) {
+  if (event.key.toLowerCase() === 'h') {
+    toggleUI();
+  }
+
+  if (event.key.toLowerCase() === 'p') {
+    captureByCurrentMode();
+  }
+}
+
+function toggleUI() {
+  document.body.classList.toggle('ui-hidden');
+}
+
+function applySceneProfile(name) {
+  const preset = PROFILE_PRESETS[name];
+  if (!preset) return;
+
+  Object.assign(params, preset);
+  params.sceneProfile = name;
+
+  if (name === 'Missão Cassini') {
+    params.captureProfile = 'Missão Cassini';
+  } else if (name === 'iPhone 17 Pro Max da Terra') {
+    params.captureProfile = 'iPhone 17 Pro Max da Terra';
+  } else {
+    params.captureProfile = 'Modo Livre';
+  }
+
+  rebuildPlanetMaps();
+  buildRingMesh();
+  createStars();
+  applyCameraFromParams();
+  updateScene();
+  updatePhonePreview();
+  refreshGui();
+}
+
+function applyCameraFromParams() {
+  camera.fov = params.fov;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  camera.position.set(params.offsetX, params.offsetY, params.distance);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function updateScene() {
+  renderer.toneMappingExposure = params.exposure;
+
+  saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.frameRotationZ);
+  saturnGroup.scale.setScalar(params.subjectScale);
+
+  sunLight.position.set(params.lightX, params.lightY, params.lightZ);
+  sunLight.intensity = params.lightIntensity;
+  ambientLight.intensity = params.ambientIntensity;
+
+  if (planetMesh) {
+    planetMesh.scale.set(1, params.polarFlattening, 1);
+    updatePlanetShaderUniforms();
+  }
+
+  if (cloudMesh) {
+    cloudMesh.visible = params.cloudOpacity > 0.001;
+    cloudMesh.material.opacity = params.cloudOpacity;
+    cloudMesh.scale.set(1.002, params.polarFlattening * 1.004, 1.002);
+  }
+
+  if (atmosphereMesh) {
+    atmosphereMesh.scale.set(
+      params.atmosphereScale,
+      params.polarFlattening * params.atmosphereScale,
+      params.atmosphereScale
+    );
+
+    atmosphereMesh.material.uniforms.uGlowIntensity.value = params.atmosphereGlow;
+    atmosphereMesh.material.uniforms.uPower.value = params.atmospherePower;
+    atmosphereMesh.material.uniforms.uIrregularity.value = params.limbIrregularity;
+    atmosphereMesh.material.uniforms.uLightDirection.value.copy(sunLight.position).normalize();
+  }
+
+  if (ringMesh) {
+    ringGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+    ringMesh.material.opacity = params.ringOpacity;
+    ringMesh.material.color.setScalar(params.ringBrightness);
+  }
+
+  if (starField) {
+    starField.visible = params.showStars && params.starCount > 0;
+  }
+
+  updatePhonePreview();
+}
+
+function updatePhonePreview() {
+  if (params.showPhoneFrame) {
+    phonePreviewEl.classList.add('active');
+  } else {
+    phonePreviewEl.classList.remove('active');
+  }
+
+  if (params.phoneOrientation === 'Horizontal') {
+    phonePreviewEl.classList.add('landscape');
+    phonePreviewEl.dataset.label = 'iPhone 17 Pro Max • 2868 × 1320';
+  } else {
+    phonePreviewEl.classList.remove('landscape');
+    phonePreviewEl.dataset.label = 'iPhone 17 Pro Max • 1320 × 2868';
+  }
 }
 
 function createPlanet() {
-  const { colorMap, bumpMap } = createSaturnMaps();
+  const { colorMap } = createSaturnMaps();
 
   const geometry = new THREE.SphereGeometry(PLANET_RADIUS, 256, 128);
 
-  const material = new THREE.MeshStandardMaterial({
-    map: colorMap,
-    bumpMap,
-    bumpScale: params.bumpScale,
-    roughness: 1.0,
-    metalness: 0,
-    color: new THREE.Color(
-      params.planetBrightness,
-      params.planetBrightness,
-      params.planetBrightness
-    )
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: colorMap },
+      uPlanetCenter: { value: new THREE.Vector3(0, 0, 0) },
+      uLightDirection: { value: new THREE.Vector3(1, 0, 0) },
+      uRingNormal: { value: new THREE.Vector3(0, 0, 1) },
+
+      uLightIntensity: { value: params.lightIntensity },
+      uAmbient: { value: params.ambientIntensity },
+      uPlanetBrightness: { value: params.planetBrightness },
+
+      uBandVisibility: { value: params.bandVisibility },
+      uTerminatorSoftness: { value: params.terminatorSoftness },
+
+      uRingInner: { value: params.ringInnerRadius },
+      uRingOuter: { value: params.ringOuterRadius },
+      uPhysicalRingShadow: { value: params.physicalRingShadow },
+      uRingShadowSharpness: { value: params.ringShadowSharpness }
+    },
+
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vViewNormal;
+
+      void main() {
+        vUv = uv;
+
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        vViewNormal = normalize(normalMatrix * normal);
+
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+
+    fragmentShader: `
+      uniform sampler2D uMap;
+      uniform vec3 uPlanetCenter;
+      uniform vec3 uLightDirection;
+      uniform vec3 uRingNormal;
+
+      uniform float uLightIntensity;
+      uniform float uAmbient;
+      uniform float uPlanetBrightness;
+      uniform float uBandVisibility;
+      uniform float uTerminatorSoftness;
+
+      uniform float uRingInner;
+      uniform float uRingOuter;
+      uniform float uPhysicalRingShadow;
+      uniform float uRingShadowSharpness;
+
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vViewNormal;
+
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+
+        float a = hash(i.x + i.y * 57.0);
+        float b = hash(i.x + 1.0 + i.y * 57.0);
+        float c = hash(i.x + (i.y + 1.0) * 57.0);
+        float d = hash(i.x + 1.0 + (i.y + 1.0) * 57.0);
+
+        vec2 u = f * f * (3.0 - 2.0 * f);
+
+        return mix(a, b, u.x) +
+               (c - a) * u.y * (1.0 - u.x) +
+               (d - b) * u.x * u.y;
+      }
+
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+
+        for (int i = 0; i < 5; i++) {
+          value += amplitude * noise(p);
+          p *= 2.03;
+          amplitude *= 0.52;
+        }
+
+        return value;
+      }
+
+      float gaussian(float x, float mean, float sigma, float amp) {
+        float e = -((x - mean) * (x - mean)) / (2.0 * sigma * sigma);
+        return amp * exp(e);
+      }
+
+      float ringDensity(float u) {
+        if (u < 0.015 || u > 0.995) return 0.0;
+
+        float d = 0.0;
+        d += gaussian(u, 0.12, 0.035, 0.08);
+        d += gaussian(u, 0.19, 0.060, 0.16);
+        d += gaussian(u, 0.29, 0.055, 0.24);
+        d += gaussian(u, 0.43, 0.075, 0.78);
+        d += gaussian(u, 0.54, 0.060, 0.96);
+        d += gaussian(u, 0.62, 0.050, 0.86);
+        d -= gaussian(u, 0.705, 0.020, 0.95);
+        d += gaussian(u, 0.77, 0.050, 0.54);
+        d += gaussian(u, 0.85, 0.040, 0.42);
+        d += gaussian(u, 0.915, 0.009, 0.24);
+        d += gaussian(u, 0.953, 0.016, 0.09);
+
+        d -= gaussian(u, 0.232, 0.006, 0.07);
+        d -= gaussian(u, 0.318, 0.005, 0.08);
+        d -= gaussian(u, 0.487, 0.004, 0.10);
+        d -= gaussian(u, 0.602, 0.005, 0.09);
+        d -= gaussian(u, 0.842, 0.006, 0.08);
+
+        return clamp(d, 0.0, 1.0);
+      }
+
+      float physicalRingShadow(vec3 worldPosition, vec3 lightDirection) {
+        vec3 ringNormal = normalize(uRingNormal);
+        vec3 lightDir = normalize(lightDirection);
+
+        vec3 relPos = worldPosition - uPlanetCenter;
+        float denom = dot(ringNormal, lightDir);
+
+        if (abs(denom) < 0.001) return 0.0;
+
+        float t = -dot(ringNormal, relPos) / denom;
+        if (t <= 0.0) return 0.0;
+
+        vec3 hitPoint = relPos + lightDir * t;
+        float radius = length(hitPoint);
+
+        float u = (radius - uRingInner) / (uRingOuter - uRingInner);
+        if (u < 0.0 || u > 1.0) return 0.0;
+
+        float density = ringDensity(u);
+        float n = fbm(vec2(u * 22.0, hitPoint.x * 0.4 + hitPoint.z * 0.4));
+        density *= mix(0.72, 1.18, n);
+
+        float shadow = smoothstep(0.02, uRingShadowSharpness, density);
+        return shadow * uPhysicalRingShadow;
+      }
+
+      void main() {
+        vec3 baseColor = texture2D(uMap, vUv).rgb;
+
+        vec3 normal = normalize(vWorldNormal);
+        vec3 lightDir = normalize(uLightDirection);
+
+        float ndl = dot(normal, lightDir);
+
+        float sunlight = smoothstep(
+          -uTerminatorSoftness,
+          0.85,
+          ndl
+        );
+
+        float latitude = vUv.y;
+
+        float bands =
+          sin(latitude * 95.0 + fbm(vec2(vUv.x * 4.0, latitude * 12.0)) * 2.2) * 0.030 +
+          sin(latitude * 180.0 + fbm(vec2(vUv.x * 8.0, latitude * 18.0)) * 2.0) * 0.018 +
+          sin(latitude * 34.0) * 0.035;
+
+        float cloudNoise = fbm(vec2(vUv.x * 18.0, latitude * 95.0));
+        bands += (cloudNoise - 0.5) * 0.055;
+
+        baseColor *= 1.0 + bands * uBandVisibility;
+
+        float ringShadow = physicalRingShadow(vWorldPosition, lightDir);
+
+        float lightValue =
+          uAmbient +
+          sunlight * uLightIntensity * (1.0 - ringShadow);
+
+        vec3 nightColor = baseColor * 0.014;
+        vec3 litColor = baseColor * lightValue;
+
+        vec3 color = mix(nightColor, litColor, sunlight);
+
+        float terminatorGlow =
+          smoothstep(-0.18, 0.16, ndl) *
+          (1.0 - smoothstep(0.10, 0.55, ndl));
+
+        color += baseColor * terminatorGlow * 0.10;
+        color *= uPlanetBrightness;
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `
   });
 
   planetMesh = new THREE.Mesh(geometry, material);
   planetMesh.scale.set(1, params.polarFlattening, 1);
   saturnGroup.add(planetMesh);
+
+  updatePlanetShaderUniforms();
 }
 
 function createCloudLayer() {
-  const cloudMap = createCloudTexture();
+  const geometry = new THREE.SphereGeometry(PLANET_RADIUS, 192, 96);
 
-  const geometry = new THREE.SphereGeometry(PLANET_RADIUS * 1.008, 192, 96);
-
-  const material = new THREE.MeshStandardMaterial({
-    map: cloudMap,
+  const material = new THREE.MeshPhongMaterial({
+    map: createCloudTexture(),
     transparent: true,
     opacity: params.cloudOpacity,
-    roughness: 1.0,
-    metalness: 0,
-    depthWrite: false
+    depthWrite: false,
+    blending: THREE.NormalBlending
   });
 
   cloudMesh = new THREE.Mesh(geometry, material);
-  cloudMesh.scale.set(1, params.polarFlattening, 1);
+  cloudMesh.scale.set(1.002, params.polarFlattening * 1.004, 1.002);
   saturnGroup.add(cloudMesh);
 }
 
@@ -219,16 +786,20 @@ function createAtmosphereGlow() {
       uGlowIntensity: { value: params.atmosphereGlow },
       uPower: { value: params.atmospherePower },
       uColor: { value: new THREE.Color(0xf2e7c8) },
-      uLightDirection: { value: new THREE.Vector3().copy(sunLight.position).normalize() }
+      uLightDirection: { value: new THREE.Vector3().copy(sunLight.position).normalize() },
+      uIrregularity: { value: params.limbIrregularity }
     },
+
     vertexShader: `
+      varying vec2 vUv;
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec3 vWorldNormal;
 
       void main() {
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vUv = uv;
 
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vNormal = normalize(normalMatrix * normal);
         vViewPosition = -mvPosition.xyz;
         vWorldNormal = normalize(mat3(modelMatrix) * normal);
@@ -236,15 +807,38 @@ function createAtmosphereGlow() {
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
+
     fragmentShader: `
       uniform float uGlowIntensity;
       uniform float uPower;
       uniform vec3 uColor;
       uniform vec3 uLightDirection;
+      uniform float uIrregularity;
 
+      varying vec2 vUv;
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec3 vWorldNormal;
+
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+
+        float a = hash(i.x + i.y * 57.0);
+        float b = hash(i.x + 1.0 + i.y * 57.0);
+        float c = hash(i.x + (i.y + 1.0) * 57.0);
+        float d = hash(i.x + 1.0 + (i.y + 1.0) * 57.0);
+
+        vec2 u = f * f * (3.0 - 2.0 * f);
+
+        return mix(a, b, u.x) +
+          (c - a) * u.y * (1.0 - u.x) +
+          (d - b) * u.x * u.y;
+      }
 
       void main() {
         vec3 normal = normalize(vNormal);
@@ -253,10 +847,16 @@ function createAtmosphereGlow() {
         vec3 lightDir = normalize(uLightDirection);
 
         float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+
+        float irregular =
+          noise(vec2(vUv.y * 44.0, vUv.x * 8.0)) * 0.55 +
+          noise(vec2(vUv.y * 130.0, vUv.x * 3.0)) * 0.25;
+
+        rim += (irregular - 0.5) * uIrregularity;
+        rim = clamp(rim, 0.0, 1.0);
         rim = pow(rim, uPower);
 
-        float lightSide = smoothstep(-0.20, 0.65, dot(worldNormal, lightDir));
-
+        float lightSide = smoothstep(-0.25, 0.65, dot(worldNormal, lightDir));
         float alpha = rim * lightSide * uGlowIntensity;
 
         gl_FragColor = vec4(uColor, alpha);
@@ -265,7 +865,6 @@ function createAtmosphereGlow() {
   });
 
   atmosphereMesh = new THREE.Mesh(geometry, material);
-
   atmosphereMesh.scale.set(
     params.atmosphereScale,
     params.polarFlattening * params.atmosphereScale,
@@ -275,992 +874,210 @@ function createAtmosphereGlow() {
   saturnGroup.add(atmosphereMesh);
 }
 
-function createRings() {
-  ringGroup = new THREE.Group();
-  ringGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
-  saturnGroup.add(ringGroup);
+function updatePlanetShaderUniforms() {
+  if (!planetMesh?.material?.uniforms) return;
 
-  buildRingMesh();
-}
+  const uniforms = planetMesh.material.uniforms;
 
-function buildRingMesh() {
-  clearRingGroup();
+  uniforms.uPlanetCenter.value.set(0, 0, 0);
+  uniforms.uLightDirection.value.copy(sunLight.position).normalize();
 
-  const ringGeometry = new THREE.RingGeometry(
-    params.ringInnerRadius,
-    params.ringOuterRadius,
-    1536,
-    18
-  );
-
-  fixRingUV(ringGeometry, params.ringInnerRadius, params.ringOuterRadius);
-
-  const ringTexture = createRingTexture();
-
-  const ringMaterial = new THREE.MeshStandardMaterial({
-    map: ringTexture,
-    transparent: true,
-    opacity: params.ringOpacity,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    roughness: 1.0,
-    metalness: 0,
-    color: new THREE.Color(
-      params.ringBrightness,
-      params.ringBrightness,
-      params.ringBrightness
-    )
-  });
-
-  ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
-  ringGroup.add(ringMesh);
-}
-
-function clearRingGroup() {
-  if (!ringGroup) return;
-
-  while (ringGroup.children.length > 0) {
-    const child = ringGroup.children.pop();
-
-    if (child.geometry) {
-      child.geometry.dispose();
-    }
-
-    if (child.material) {
-      if (child.material.map) {
-        child.material.map.dispose();
-      }
-
-      child.material.dispose();
-    }
-  }
-}
-
-function createStars() {
-  const positions = [];
-  const colors = [];
-  const geometry = new THREE.BufferGeometry();
-
-  for (let i = 0; i < params.starCount; i++) {
-    const radius = THREE.MathUtils.randFloat(120, 260);
-    const theta = THREE.MathUtils.randFloat(0, Math.PI * 2);
-    const phi = Math.acos(THREE.MathUtils.randFloatSpread(2));
-
-    const x = radius * Math.sin(phi) * Math.cos(theta);
-    const y = radius * Math.sin(phi) * Math.sin(theta);
-    const z = radius * Math.cos(phi);
-
-    positions.push(x, y, z);
-
-    const intensity = THREE.MathUtils.randFloat(0.5, 1.0) * params.starBrightness;
-    colors.push(intensity, intensity, intensity);
-  }
-
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-  const material = new THREE.PointsMaterial({
-    size: params.starSize,
-    vertexColors: true,
-    transparent: true,
-    opacity: 1.0,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-
-  stars = new THREE.Points(geometry, material);
-  scene.add(stars);
-}
-
-function createControls() {
-  controls = new OrbitControls(camera, renderer.domElement);
-
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-
-  controls.autoRotate = params.autoRotate;
-  controls.autoRotateSpeed = params.autoRotateSpeed;
-
-  controls.enablePan = true;
-  controls.minDistance = 5;
-  controls.maxDistance = 40;
-
-  controls.target.set(0, 0, 0);
-  controls.update();
-}
-
-function createGui() {
-  gui = new GUI({
-    title: 'SATURN CASSINI MODE',
-    width: 340
-  });
-
-  const folderCamera = gui.addFolder('Composição');
-  folderCamera.add(params, 'cameraFov', 12, 65, 1).name('FOV').onChange(updateScene);
-  folderCamera.add(params, 'cameraDistance', 5, 35, 0.1).name('Distância').onChange(updateCameraPosition);
-  folderCamera.add(params, 'cameraOffsetX', -8, 8, 0.01).name('Offset X').onChange(updateCameraPosition);
-  folderCamera.add(params, 'cameraOffsetY', -5, 5, 0.01).name('Offset Y').onChange(updateCameraPosition);
-  folderCamera.add(params, 'frameRotationZ', -30, 30, 0.1).name('Rotação quadro').onChange(updateScene);
-
-  const folderCameraMode = gui.addFolder('Modo Câmera');
-  folderCameraMode
-    .add(params, 'cameraProfile', [
-      'Cassini Natural',
-      'Cassini Mono',
-      'Wallpaper Celular',
-      'Deep Black Print'
-    ])
-    .name('Perfil')
-    .onChange(applyCameraProfile);
-
-  folderCameraMode.add(params, 'sensorGrain', 0, 0.08, 0.001).name('Ruído sensor');
-  folderCameraMode.add(params, 'cameraVignette', 0, 0.75, 0.01).name('Vinheta');
-  folderCameraMode.add(params, 'cameraBloom', 0, 0.12, 0.001).name('Bloom mínimo');
-  folderCameraMode.add(params, 'cameraMono').name('P&B câmera');
-
-  folderCameraMode
-    .add(params, 'mobileWallpaperMode')
-    .name('Modo celular')
-    .onChange(() => {
-      if (params.mobileWallpaperMode) {
-        applyMobileWallpaperPreset();
-      }
-    });
-
-  const folderPlanet = gui.addFolder('Saturno');
-  folderPlanet.add(params, 'polarFlattening', 0.82, 1.0, 0.001).name('Achatamento polar').onChange(updateScene);
-  folderPlanet.add(params, 'planetBrightness', 0.5, 1.5, 0.01).name('Brilho').onChange(updateScene);
-  folderPlanet.add(params, 'bumpScale', 0, 0.012, 0.0005).name('Relevo nuvens').onChange(updateScene);
-  folderPlanet.add(params, 'cloudOpacity', 0, 0.35, 0.01).name('Opac. nuvens').onChange(updateScene);
-  folderPlanet.add(params, 'planetSpinSpeed', 0, 0.01, 0.0001).name('Rot. planeta');
-  folderPlanet.add(params, 'cloudSpeed', 0, 0.02, 0.0001).name('Rot. nuvens');
-  folderPlanet.add(params, 'showHexagonHint').name('Hexágono polar').onChange(rebuildPlanetMaps);
-
-  const folderAtmosphere = gui.addFolder('Atmosfera');
-  folderAtmosphere.add(params, 'atmosphereGlow', 0, 1.2, 0.01).name('Rim glow').onChange(updateScene);
-  folderAtmosphere.add(params, 'atmospherePower', 0.5, 6, 0.01).name('Queda glow').onChange(updateScene);
-  folderAtmosphere.add(params, 'atmosphereScale', 1.0, 1.08, 0.001).name('Escala atmosfera').onChange(updateScene);
-
-  const folderShadows = gui.addFolder('Sombra dos Anéis');
-  folderShadows.add(params, 'ringShadowStrength', 0, 1, 0.01).name('Intensidade').onChange(rebuildPlanetMaps);
-  folderShadows.add(params, 'ringShadowSoftness', 0, 2, 0.01).name('Suavidade').onChange(rebuildPlanetMaps);
-
-  const folderRings = gui.addFolder('Anéis');
-  folderRings.add(params, 'ringTilt', 50, 89, 0.1).name('Inclinação').onChange(updateScene);
-  folderRings.add(params, 'ringOpacity', 0.2, 1.0, 0.01).name('Opacidade').onChange(updateScene);
-  folderRings.add(params, 'ringBrightness', 0.4, 1.4, 0.01).name('Brilho').onChange(updateScene);
-  folderRings.add(params, 'ringChaos', 0, 1.2, 0.01).name('Caos radial').onFinishChange(buildRingMesh);
-  folderRings.add(params, 'ringSpiralWaves', 0, 1.2, 0.01).name('Ondas').onFinishChange(buildRingMesh);
-
-  const folderLight = gui.addFolder('Luz');
-  folderLight.add(params, 'lightX', -20, 20, 0.1).name('Luz X').onChange(updateScene);
-  folderLight.add(params, 'lightY', -20, 20, 0.1).name('Luz Y').onChange(updateScene);
-  folderLight.add(params, 'lightZ', -20, 20, 0.1).name('Luz Z').onChange(updateScene);
-  folderLight.add(params, 'lightIntensity', 0, 5, 0.01).name('Intensidade').onChange(updateScene);
-  folderLight.add(params, 'ambientIntensity', 0, 0.08, 0.001).name('Luz ambiente').onChange(updateScene);
-
-  const folderRender = gui.addFolder('Render');
-  folderRender.add(params, 'rendererExposure', 0.3, 1.5, 0.01).name('Exposição').onChange(updateScene);
-  folderRender.add(params, 'starBrightness', 0, 0.5, 0.01).name('Brilho estrelas').onChange(rebuildStars);
-  folderRender.add(params, 'starSize', 0.005, 0.1, 0.001).name('Tam. estrelas').onChange(rebuildStars);
-  folderRender.add(params, 'starCount', 0, 1500, 1).name('Qtd estrelas').onFinishChange(rebuildStars);
-  folderRender.add(params, 'showUI').name('Mostrar UI').onChange(setUIVisibility);
-
-  const actions = {
-    export4K: () => exportPNG(3840, 2160, 'Saturno_Cassini_4K.png'),
-    exportVertical: () => exportPNG(2160, 3840, 'Saturno_Cassini_4K_Vertical.png'),
-    exportSquare: () => exportPNG(4096, 4096, 'Saturno_Cassini_4096.png'),
-    presetCassini: applyCameraProfile,
-    presetMobile: applyMobileWallpaperPreset,
-    reset: resetView
-  };
-
-  const folderActions = gui.addFolder('Ações');
-  folderActions.add(actions, 'export4K').name('Capturar 3840x2160');
-  folderActions.add(actions, 'exportVertical').name('Capturar 2160x3840');
-  folderActions.add(actions, 'exportSquare').name('Capturar 4096x4096');
-  folderActions.add(actions, 'presetCassini').name('Aplicar perfil');
-  folderActions.add(actions, 'presetMobile').name('Preset celular');
-  folderActions.add(actions, 'reset').name('Reset');
-
-  folderCamera.open();
-  folderCameraMode.open();
-  folderPlanet.open();
-  folderAtmosphere.open();
-  folderRings.open();
-  folderActions.open();
-}
-
-/* =========================================================
-   UPDATE
-========================================================= */
-
-function updateCameraPosition() {
-  if (!camera) return;
-
-  camera.position.set(
-    params.cameraOffsetX,
-    params.cameraOffsetY + 0.55,
-    params.cameraDistance
-  );
-
-  if (controls) {
-    controls.target.set(0, 0, 0);
-    controls.update();
-  }
-}
-
-function updateScene() {
-  renderer.toneMappingExposure = params.rendererExposure;
-
-  camera.fov = params.cameraFov;
-  camera.updateProjectionMatrix();
-
-  updateCameraPosition();
-
-  saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.frameRotationZ);
-
-  if (planetMesh) {
-    planetMesh.scale.set(1, params.polarFlattening, 1);
-
-    planetMesh.material.color.setRGB(
-      params.planetBrightness,
-      params.planetBrightness,
-      params.planetBrightness
-    );
-
-    planetMesh.material.bumpScale = params.bumpScale;
-  }
-
-  if (cloudMesh) {
-    cloudMesh.scale.set(1, params.polarFlattening, 1);
-    cloudMesh.material.opacity = params.cloudOpacity;
-  }
-
-  if (atmosphereMesh) {
-    atmosphereMesh.scale.set(
-      params.atmosphereScale,
-      params.polarFlattening * params.atmosphereScale,
-      params.atmosphereScale
-    );
-
-    atmosphereMesh.material.uniforms.uGlowIntensity.value = params.atmosphereGlow;
-    atmosphereMesh.material.uniforms.uPower.value = params.atmospherePower;
-    atmosphereMesh.material.uniforms.uLightDirection.value.copy(sunLight.position).normalize();
-  }
-
+  const ringNormal = new THREE.Vector3(0, 0, 1);
   if (ringGroup) {
-    ringGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+    ringGroup.updateWorldMatrix(true, false);
+    ringNormal.applyQuaternion(ringGroup.getWorldQuaternion(new THREE.Quaternion()));
   }
 
-  if (ringMesh) {
-    ringMesh.material.opacity = params.ringOpacity;
-    ringMesh.material.color.setRGB(
-      params.ringBrightness,
-      params.ringBrightness,
-      params.ringBrightness
-    );
-  }
-
-  sunLight.position.set(params.lightX, params.lightY, params.lightZ);
-  sunLight.intensity = params.lightIntensity;
-
-  ambientLight.intensity = params.ambientIntensity;
-
-  controls.autoRotate = params.autoRotate;
-  controls.autoRotateSpeed = params.autoRotateSpeed;
+  uniforms.uRingNormal.value.copy(ringNormal.normalize());
+  uniforms.uLightIntensity.value = params.lightIntensity;
+  uniforms.uAmbient.value = params.ambientIntensity;
+  uniforms.uPlanetBrightness.value = params.planetBrightness;
+  uniforms.uBandVisibility.value = params.bandVisibility;
+  uniforms.uTerminatorSoftness.value = params.terminatorSoftness;
+  uniforms.uRingInner.value = params.ringInnerRadius;
+  uniforms.uRingOuter.value = params.ringOuterRadius;
+  uniforms.uPhysicalRingShadow.value = params.physicalRingShadow;
+  uniforms.uRingShadowSharpness.value = params.ringShadowSharpness;
 }
-
-function rebuildPlanetMaps() {
-  if (planetMesh?.material?.map) planetMesh.material.map.dispose();
-  if (planetMesh?.material?.bumpMap) planetMesh.material.bumpMap.dispose();
-  if (cloudMesh?.material?.map) cloudMesh.material.map.dispose();
-
-  const { colorMap, bumpMap } = createSaturnMaps();
-
-  planetMesh.material.map = colorMap;
-  planetMesh.material.bumpMap = bumpMap;
-  planetMesh.material.needsUpdate = true;
-
-  cloudMesh.material.map = createCloudTexture();
-  cloudMesh.material.needsUpdate = true;
-}
-
-function rebuildStars() {
-  if (stars) {
-    scene.remove(stars);
-    stars.geometry.dispose();
-    stars.material.dispose();
-    stars = null;
-  }
-
-  createStars();
-}
-
-function setUIVisibility() {
-  document.body.classList.toggle('ui-hidden', !params.showUI);
-}
-
-function refreshGui() {
-  if (!gui || typeof gui.controllersRecursive !== 'function') return;
-
-  gui.controllersRecursive().forEach((controller) => {
-    controller.updateDisplay();
-  });
-}
-
-/* =========================================================
-   PRESETS
-========================================================= */
-
-function applyCameraProfile() {
-  if (params.cameraProfile === 'Cassini Natural') {
-    params.cameraMono = false;
-    params.sensorGrain = 0.014;
-    params.cameraVignette = 0.20;
-    params.cameraBloom = 0.025;
-
-    params.starCount = 55;
-    params.starBrightness = 0.045;
-    params.starSize = 0.026;
-
-    params.ambientIntensity = 0.0;
-    params.bumpScale = 0.003;
-    params.rendererExposure = 0.96;
-
-    params.atmosphereGlow = 0.34;
-    params.ringShadowStrength = 0.34;
-  }
-
-  if (params.cameraProfile === 'Cassini Mono') {
-    params.cameraMono = true;
-    params.sensorGrain = 0.018;
-    params.cameraVignette = 0.27;
-    params.cameraBloom = 0.018;
-
-    params.starCount = 35;
-    params.starBrightness = 0.035;
-    params.starSize = 0.023;
-
-    params.ambientIntensity = 0.0;
-    params.bumpScale = 0.001;
-    params.rendererExposure = 0.90;
-
-    params.atmosphereGlow = 0.30;
-    params.ringShadowStrength = 0.42;
-  }
-
-  if (params.cameraProfile === 'Deep Black Print') {
-    params.cameraMono = true;
-    params.sensorGrain = 0.012;
-    params.cameraVignette = 0.38;
-    params.cameraBloom = 0.012;
-
-    params.starCount = 0;
-    params.starBrightness = 0;
-
-    params.ambientIntensity = 0.0;
-    params.bumpScale = 0.0;
-    params.rendererExposure = 0.84;
-
-    params.atmosphereGlow = 0.25;
-    params.ringShadowStrength = 0.48;
-  }
-
-  if (params.cameraProfile === 'Wallpaper Celular') {
-    applyMobileWallpaperPreset();
-    return;
-  }
-
-  rebuildPlanetMaps();
-  buildRingMesh();
-  rebuildStars();
-  updateScene();
-  refreshGui();
-}
-
-function applyMobileWallpaperPreset() {
-  params.cameraProfile = 'Wallpaper Celular';
-  params.mobileWallpaperMode = true;
-
-  params.cameraFov = 21;
-  params.cameraDistance = 18.6;
-  params.cameraOffsetX = 0.0;
-  params.cameraOffsetY = -0.35;
-
-  params.frameRotationZ = -7.5;
-
-  params.ringTilt = 74.2;
-  params.ringOpacity = 0.96;
-  params.ringBrightness = 0.98;
-  params.ringChaos = 0.50;
-  params.ringSpiralWaves = 0.34;
-
-  params.lightX = 8.4;
-  params.lightY = 4.2;
-  params.lightZ = 10.8;
-  params.lightIntensity = 2.5;
-  params.ambientIntensity = 0.0;
-
-  params.starCount = 25;
-  params.starBrightness = 0.025;
-  params.starSize = 0.02;
-
-  params.rendererExposure = 0.92;
-
-  params.cameraMono = false;
-  params.sensorGrain = 0.014;
-  params.cameraVignette = 0.32;
-  params.cameraBloom = 0.018;
-
-  params.atmosphereGlow = 0.32;
-  params.ringShadowStrength = 0.38;
-
-  rebuildPlanetMaps();
-  buildRingMesh();
-  rebuildStars();
-  updateCameraPosition();
-  updateScene();
-  refreshGui();
-}
-
-function resetView() {
-  params.showUI = true;
-  params.cameraProfile = 'Cassini Natural';
-  params.mobileWallpaperMode = false;
-
-  params.autoRotate = false;
-  params.autoRotateSpeed = 0.04;
-
-  params.cameraFov = 24;
-  params.cameraDistance = 16.8;
-  params.cameraOffsetX = 0.0;
-  params.cameraOffsetY = 0.2;
-
-  params.frameRotationZ = -8;
-  params.planetSpinSpeed = 0.0;
-  params.cloudSpeed = 0.0;
-  params.polarFlattening = 0.902;
-
-  params.lightX = 8.5;
-  params.lightY = 4.0;
-  params.lightZ = 10.5;
-  params.lightIntensity = 2.55;
-  params.ambientIntensity = 0.0;
-
-  params.planetBrightness = 1.0;
-  params.bumpScale = 0.003;
-  params.cloudOpacity = 0.09;
-  params.showHexagonHint = true;
-
-  params.atmosphereGlow = 0.34;
-  params.atmospherePower = 2.7;
-  params.atmosphereScale = 1.025;
-
-  params.ringShadowStrength = 0.34;
-  params.ringShadowSoftness = 0.72;
-
-  params.ringTilt = 73.5;
-  params.ringOpacity = 0.97;
-  params.ringBrightness = 1.0;
-  params.ringChaos = 0.52;
-  params.ringSpiralWaves = 0.38;
-
-  params.starCount = 65;
-  params.starBrightness = 0.055;
-  params.starSize = 0.028;
-
-  params.rendererExposure = 0.96;
-
-  params.sensorGrain = 0.014;
-  params.cameraVignette = 0.20;
-  params.cameraBloom = 0.025;
-  params.cameraMono = false;
-
-  setUIVisibility();
-  rebuildPlanetMaps();
-  buildRingMesh();
-  rebuildStars();
-  updateCameraPosition();
-  updateScene();
-  refreshGui();
-}
-
-/* =========================================================
-   EVENTOS
-========================================================= */
-
-function bindButtons() {
-  document.getElementById('btn-export-4k')?.addEventListener('click', () => {
-    exportPNG(3840, 2160, 'Saturno_Cassini_4K.png');
-  });
-
-  document.getElementById('btn-export-vertical')?.addEventListener('click', () => {
-    exportPNG(2160, 3840, 'Saturno_Cassini_4K_Vertical.png');
-  });
-
-  document.getElementById('btn-export-square')?.addEventListener('click', () => {
-    exportPNG(4096, 4096, 'Saturno_Cassini_4096.png');
-  });
-
-  document.getElementById('btn-reset')?.addEventListener('click', resetView);
-
-  document.getElementById('btn-toggle-ui')?.addEventListener('click', () => {
-    params.showUI = !params.showUI;
-    setUIVisibility();
-    refreshGui();
-  });
-}
-
-function bindKeyboard() {
-  window.addEventListener('keydown', (event) => {
-    const key = event.key.toLowerCase();
-
-    if (key === 'h') {
-      params.showUI = !params.showUI;
-      setUIVisibility();
-      refreshGui();
-    }
-
-    if (key === 'p') {
-      exportPNG(3840, 2160, 'Saturno_Cassini_4K.png');
-    }
-  });
-}
-
-function onResize() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-
-  renderer.setSize(width, height, false);
-
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-}
-
-/* =========================================================
-   LOOP
-========================================================= */
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  const delta = clock.getDelta();
-
-  if (planetMesh) {
-    planetMesh.rotation.y += params.planetSpinSpeed * delta * 60;
-  }
-
-  if (cloudMesh) {
-    cloudMesh.rotation.y += params.cloudSpeed * delta * 60;
-  }
-
-  controls.update();
-  renderer.render(scene, camera);
-}
-
-/* =========================================================
-   EXPORTAÇÃO
-========================================================= */
-
-async function exportPNG(width, height, fileName) {
-  showCaptureStatus(true);
-  triggerFlash();
-
-  await nextFrame();
-
-  const oldSize = new THREE.Vector2();
-  renderer.getSize(oldSize);
-
-  const oldPixelRatio = renderer.getPixelRatio();
-  const oldAspect = camera.aspect;
-  const oldAutoRotate = controls.autoRotate;
-  const oldShowUI = params.showUI;
-
-  try {
-    params.showUI = false;
-    setUIVisibility();
-
-    controls.autoRotate = false;
-
-    renderer.setPixelRatio(1);
-    renderer.setSize(width, height, false);
-
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-
-    renderer.render(scene, camera);
-
-    const processedCanvas = applyCameraPostProcess(renderer.domElement, width, height);
-
-    await saveCanvasAsPNG(processedCanvas, fileName);
-  } finally {
-    renderer.setPixelRatio(oldPixelRatio);
-    renderer.setSize(oldSize.x, oldSize.y, false);
-
-    camera.aspect = oldAspect;
-    camera.updateProjectionMatrix();
-
-    controls.autoRotate = oldAutoRotate;
-
-    params.showUI = oldShowUI;
-    setUIVisibility();
-
-    showCaptureStatus(false);
-  }
-}
-
-function applyCameraPostProcess(sourceCanvas, width, height) {
-  const output = document.createElement('canvas');
-  output.width = width;
-  output.height = height;
-
-  const ctx = output.getContext('2d');
-  ctx.drawImage(sourceCanvas, 0, 0, width, height);
-
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-
-  const cx = width * 0.5;
-  const cy = height * 0.5;
-  const maxDist = Math.sqrt(cx * cx + cy * cy);
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-
-      let r = data[i];
-      let g = data[i + 1];
-      let b = data[i + 2];
-
-      if (params.cameraMono || params.cameraProfile === 'Cassini Mono') {
-        const gray = r * 0.299 + g * 0.587 + b * 0.114;
-        r = gray;
-        g = gray;
-        b = gray;
-      }
-
-      const grain = (Math.random() - 0.5) * 255 * params.sensorGrain;
-
-      r += grain;
-      g += grain;
-      b += grain;
-
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy) / maxDist;
-      const vignette = 1.0 - Math.pow(dist, 1.7) * params.cameraVignette;
-
-      r *= vignette;
-      g *= vignette;
-      b *= vignette;
-
-      data[i] = clamp(r, 0, 255);
-      data[i + 1] = clamp(g, 0, 255);
-      data[i + 2] = clamp(b, 0, 255);
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-
-  if (params.cameraBloom > 0) {
-    ctx.save();
-    ctx.globalAlpha = params.cameraBloom;
-    ctx.filter = 'blur(2px)';
-    ctx.globalCompositeOperation = 'screen';
-    ctx.drawImage(output, 0, 0);
-    ctx.restore();
-  }
-
-  return output;
-}
-
-function saveCanvasAsPNG(sourceCanvas, fileName) {
-  return new Promise((resolve) => {
-    sourceCanvas.toBlob((blob) => {
-      if (!blob) {
-        const link = document.createElement('a');
-        link.download = fileName;
-        link.href = sourceCanvas.toDataURL('image/png');
-        link.click();
-        resolve();
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-
-      link.download = fileName;
-      link.href = url;
-      link.click();
-
-      URL.revokeObjectURL(url);
-      resolve();
-    }, 'image/png', 1);
-  });
-}
-
-function showCaptureStatus(show) {
-  if (!captureStatus) return;
-
-  captureStatus.style.display = show ? 'block' : 'none';
-}
-
-function triggerFlash() {
-  if (!flash) return;
-
-  flash.style.opacity = '1';
-
-  setTimeout(() => {
-    flash.style.opacity = '0';
-  }, 90);
-}
-
-function nextFrame() {
-  return new Promise((resolve) => requestAnimationFrame(resolve));
-}
-
-/* =========================================================
-   TEXTURA DE SATURNO
-========================================================= */
 
 function createSaturnMaps() {
   const width = 4096;
   const height = 2048;
 
-  const colorCanvas = document.createElement('canvas');
-  colorCanvas.width = width;
-  colorCanvas.height = height;
+  const mapCanvas = document.createElement('canvas');
+  mapCanvas.width = width;
+  mapCanvas.height = height;
+  const ctx = mapCanvas.getContext('2d');
 
-  const ctx = colorCanvas.getContext('2d');
-
-  const baseGradient = ctx.createLinearGradient(0, 0, 0, height);
-  baseGradient.addColorStop(0.00, '#d8d2be');
-  baseGradient.addColorStop(0.10, '#d9cfb2');
-  baseGradient.addColorStop(0.22, '#e2d8bf');
-  baseGradient.addColorStop(0.34, '#d7ccb0');
-  baseGradient.addColorStop(0.48, '#ead9b2');
-  baseGradient.addColorStop(0.60, '#dbc7a5');
-  baseGradient.addColorStop(0.78, '#e7d7b8');
-  baseGradient.addColorStop(0.92, '#d5c8ac');
-  baseGradient.addColorStop(1.00, '#cdbf9f');
-
-  ctx.fillStyle = baseGradient;
-  ctx.fillRect(0, 0, width, height);
+  const img = ctx.createImageData(width, height);
+  const data = img.data;
 
   for (let y = 0; y < height; y++) {
-    const v = y / height;
+    const v = y / (height - 1);
+    const lat = (v - 0.5) * 2.0;
 
-    const largeBand =
-      Math.sin(v * 42 + 0.4) * 0.035 +
-      Math.sin(v * 95 + 1.3) * 0.015 +
-      Math.sin(v * 180 + 0.8) * 0.008;
+    for (let x = 0; x < width; x++) {
+      const u = x / (width - 1);
 
-    const warm =
-      Math.sin(v * 22 + 2.1) * 7 +
-      Math.sin(v * 58 + 0.9) * 3;
+      let bands =
+        Math.sin(v * 26.0) * 0.020 +
+        Math.sin(v * 62.0 + pseudoNoise2D(u * 7.0, v * 5.0) * 0.8) * 0.028 +
+        Math.sin(v * 128.0 + pseudoNoise2D(u * 14.0, v * 18.0) * 1.6) * 0.014;
 
-    const darkAlpha = clamp(0.018 + Math.abs(largeBand) * 0.11, 0, 0.12);
-    const lightAlpha = clamp(0.008 + Math.abs(largeBand) * 0.06, 0, 0.07);
+      bands += (fbm2D(u * 6.0, v * 18.0) - 0.5) * 0.045;
 
-    if (largeBand > 0) {
-      ctx.fillStyle = `rgba(${214 + warm}, ${194 + warm * 0.7}, ${155 + warm * 0.4}, ${lightAlpha})`;
-    } else {
-      ctx.fillStyle = `rgba(92, 86, 80, ${darkAlpha})`;
+      const polarFade = smoothstep(0.15, 0.95, Math.abs(lat));
+      const baseR = 0.92 - polarFade * 0.06;
+      const baseG = 0.86 - polarFade * 0.06;
+      const baseB = 0.72 - polarFade * 0.05;
+
+      let r = baseR + bands * 0.55;
+      let g = baseG + bands * 0.42;
+      let b = baseB + bands * 0.20;
+
+      if (params.showHexagonHint && v < 0.20) {
+        const cx = 0.5;
+        const cy = 0.10;
+        const dx = u - cx;
+        const dy = v - cy;
+
+        const angle = Math.atan2(dy, dx);
+        const radius = Math.sqrt(dx * dx + dy * dy);
+        const hex = Math.cos(angle * 6.0);
+        const hexBand = smoothstep(0.10, 0.02, Math.abs(radius - (0.10 + hex * 0.010)));
+        const hint = hexBand * params.hexagonStrength;
+
+        r -= hint * 0.06;
+        g -= hint * 0.07;
+        b -= hint * 0.08;
+      }
+
+      const i = (y * width + x) * 4;
+      data[i] = clamp(r * 255, 0, 255);
+      data[i + 1] = clamp(g * 255, 0, 255);
+      data[i + 2] = clamp(b * 255, 0, 255);
+      data[i + 3] = 255;
     }
-
-    ctx.fillRect(0, y, width, 1);
   }
 
-  ctx.save();
+  ctx.putImageData(img, 0, 0);
 
-  for (let i = 0; i < 1500; i++) {
-    const y = randomRange(0, height);
-    const h = randomRange(2, 10);
-    const alpha = randomRange(0.008, 0.035);
-
-    const gradient = ctx.createLinearGradient(0, y, width, y);
-    gradient.addColorStop(0.00, `rgba(255,255,255,${alpha * 0.2})`);
-    gradient.addColorStop(0.25, `rgba(255,248,230,${alpha})`);
-    gradient.addColorStop(0.50, `rgba(235,216,180,${alpha * 0.8})`);
-    gradient.addColorStop(0.75, `rgba(255,248,230,${alpha})`);
-    gradient.addColorStop(1.00, `rgba(255,255,255,${alpha * 0.2})`);
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, y, width, h);
-  }
-
-  for (let i = 0; i < 650; i++) {
-    const y = randomRange(0, height);
-    const h = randomRange(1, 6);
-    const alpha = randomRange(0.006, 0.022);
-
-    ctx.fillStyle = `rgba(55, 48, 42, ${alpha})`;
-    ctx.fillRect(0, y, width, h);
-  }
-
-  ctx.filter = 'blur(18px)';
-
-  for (let i = 0; i < 36; i++) {
-    const x = randomRange(0, width);
-    const y = randomRange(height * 0.18, height * 0.82);
-    const w = randomRange(60, 240);
-    const h = randomRange(20, 80);
-    const alpha = randomRange(0.018, 0.050);
-
-    ctx.beginPath();
-    ctx.ellipse(x, y, w, h, randomRange(-0.4, 0.4), 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(245,235,210,${alpha})`;
-    ctx.fill();
-  }
-
-  for (let i = 0; i < 26; i++) {
-    const x = randomRange(0, width);
-    const y = randomRange(height * 0.18, height * 0.82);
-    const w = randomRange(40, 180);
-    const h = randomRange(12, 55);
-    const alpha = randomRange(0.018, 0.048);
-
-    ctx.beginPath();
-    ctx.ellipse(x, y, w, h, randomRange(-0.5, 0.5), 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(88,78,68,${alpha})`;
-    ctx.fill();
-  }
-
-  ctx.filter = 'none';
-  ctx.restore();
-
-  if (params.showHexagonHint) {
-    const hexY = height * 0.115;
-    const hexRadius = 190;
-
-    ctx.save();
-    ctx.filter = 'blur(24px)';
-
-    ctx.beginPath();
-    drawIrregularHexagon(ctx, width * 0.5, hexY, hexRadius, 0.22);
-    ctx.fillStyle = 'rgba(80, 94, 105, 0.11)';
-    ctx.fill();
-
-    ctx.beginPath();
-    drawIrregularHexagon(ctx, width * 0.5, hexY, hexRadius * 0.68, 0.34);
-    ctx.fillStyle = 'rgba(230, 236, 232, 0.045)';
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  drawRingShadowOnAtmosphere(ctx, width, height);
-
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = randomRange(-2.2, 2.2);
-
-    data[i] = clamp(data[i] + noise, 0, 255);
-    data[i + 1] = clamp(data[i + 1] + noise, 0, 255);
-    data[i + 2] = clamp(data[i + 2] + noise, 0, 255);
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-
-  const bumpCanvas = document.createElement('canvas');
-  bumpCanvas.width = width;
-  bumpCanvas.height = height;
-
-  const bctx = bumpCanvas.getContext('2d');
-  bctx.drawImage(colorCanvas, 0, 0);
-
-  const bumpData = bctx.getImageData(0, 0, width, height);
-  const bd = bumpData.data;
-
-  for (let i = 0; i < bd.length; i += 4) {
-    const gray = bd[i] * 0.299 + bd[i + 1] * 0.587 + bd[i + 2] * 0.114;
-    const contrasted = clamp(((gray / 255 - 0.5) * 1.15 + 0.5) * 255, 0, 255);
-
-    bd[i] = contrasted;
-    bd[i + 1] = contrasted;
-    bd[i + 2] = contrasted;
-  }
-
-  bctx.putImageData(bumpData, 0, 0);
-
-  const colorMap = new THREE.CanvasTexture(colorCanvas);
+  const colorMap = new THREE.CanvasTexture(mapCanvas);
   colorMap.colorSpace = THREE.SRGBColorSpace;
   colorMap.wrapS = THREE.RepeatWrapping;
   colorMap.wrapT = THREE.ClampToEdgeWrapping;
   colorMap.anisotropy = 16;
 
-  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
-  bumpMap.wrapS = THREE.RepeatWrapping;
-  bumpMap.wrapT = THREE.ClampToEdgeWrapping;
-  bumpMap.anisotropy = 16;
-
-  return { colorMap, bumpMap };
+  return { colorMap };
 }
 
 function createCloudTexture() {
-  const width = 4096;
-  const height = 2048;
+  const width = 2048;
+  const height = 1024;
 
   const cloudCanvas = document.createElement('canvas');
   cloudCanvas.width = width;
   cloudCanvas.height = height;
-
   const ctx = cloudCanvas.getContext('2d');
 
-  ctx.clearRect(0, 0, width, height);
+  const img = ctx.createImageData(width, height);
+  const data = img.data;
 
-  for (let i = 0; i < 1300; i++) {
-    const y = randomRange(0, height);
-    const h = randomRange(1, 5);
-    const alpha = randomRange(0.008, 0.038);
+  for (let y = 0; y < height; y++) {
+    const v = y / (height - 1);
 
-    const gradient = ctx.createLinearGradient(0, y, width, y);
-    gradient.addColorStop(0, `rgba(255,255,255,${alpha * 0.15})`);
-    gradient.addColorStop(0.25, `rgba(255,255,255,${alpha * 0.5})`);
-    gradient.addColorStop(0.50, `rgba(255,255,255,${alpha})`);
-    gradient.addColorStop(0.75, `rgba(255,255,255,${alpha * 0.5})`);
-    gradient.addColorStop(1, `rgba(255,255,255,${alpha * 0.15})`);
+    for (let x = 0; x < width; x++) {
+      const u = x / (width - 1);
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, y, width, h);
+      let n =
+        fbm2D(u * 12.0, v * 50.0) * 0.65 +
+        fbm2D(u * 32.0, v * 120.0) * 0.35;
+
+      n = clamp(n, 0, 1);
+
+      const band = Math.sin(v * 120.0 + fbm2D(u * 8.0, v * 40.0) * 2.0) * 0.5 + 0.5;
+      const alpha = clamp((n * band - 0.42) * 2.2, 0, 1) * 0.55;
+
+      const i = (y * width + x) * 4;
+      data[i] = 245;
+      data[i + 1] = 242;
+      data[i + 2] = 236;
+      data[i + 3] = clamp(alpha * 255, 0, 255);
+    }
   }
 
-  ctx.filter = 'blur(14px)';
-
-  for (let i = 0; i < 28; i++) {
-    const x = randomRange(0, width);
-    const y = randomRange(height * 0.15, height * 0.85);
-    const w = randomRange(60, 220);
-    const h = randomRange(20, 60);
-    const alpha = randomRange(0.012, 0.045);
-
-    ctx.beginPath();
-    ctx.ellipse(x, y, w, h, randomRange(-0.4, 0.4), 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fill();
-  }
-
-  ctx.filter = 'none';
+  ctx.putImageData(img, 0, 0);
 
   const texture = new THREE.CanvasTexture(cloudCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.anisotropy = 16;
+  texture.anisotropy = 8;
 
   return texture;
 }
 
-/* =========================================================
-   TEXTURA DOS ANÉIS
-========================================================= */
+function buildRingMesh() {
+  if (ringMesh) {
+    ringGroup.remove(ringMesh);
+    disposeMaterial(ringMesh.material);
+    ringMesh.geometry.dispose();
+  }
+
+  const geometry = new THREE.RingGeometry(
+    params.ringInnerRadius,
+    params.ringOuterRadius,
+    320,
+    1
+  );
+
+  remapRingUVs(geometry, params.ringInnerRadius, params.ringOuterRadius);
+
+  const texture = createRingTexture();
+
+  const material = new THREE.MeshPhongMaterial({
+    map: texture,
+    alphaMap: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: true,
+    opacity: params.ringOpacity,
+    alphaTest: 0.03,
+    color: new THREE.Color().setScalar(params.ringBrightness),
+    shininess: 18
+  });
+
+  ringMesh = new THREE.Mesh(geometry, material);
+  ringGroup.add(ringMesh);
+
+  ringGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+  updatePlanetShaderUniforms();
+}
+
+function remapRingUVs(geometry, innerRadius, outerRadius) {
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+
+    const radius = Math.sqrt(x * x + y * y);
+    let angle = Math.atan2(y, x);
+    if (angle < 0) angle += Math.PI * 2;
+
+    const u = (radius - innerRadius) / (outerRadius - innerRadius);
+    const v = angle / (Math.PI * 2);
+
+    uv.setXY(i, u, v);
+  }
+
+  uv.needsUpdate = true;
+}
 
 function createRingTexture() {
   const width = 4096;
-  const height = 512;
+  const height = 768;
 
   const ringCanvas = document.createElement('canvas');
   ringCanvas.width = width;
@@ -1271,50 +1088,47 @@ function createRingTexture() {
   const data = imageData.data;
 
   for (let y = 0; y < height; y++) {
-    const v = y / height;
+    const theta = y / height;
 
     for (let x = 0; x < width; x++) {
       const u = x / (width - 1);
 
       let density = ringDensityProfile(u);
 
-      const largeChaos =
-        fbm1D(u * 18.0 + v * 1.7) * 0.42 +
-        fbm1D(u * 53.0 + v * 3.1) * 0.24 +
-        fbm1D(u * 140.0 + v * 8.0) * 0.12;
+      const macro =
+        fbm2D(u * 12.0, theta * 7.0) * 0.55 +
+        fbm2D(u * 26.0, theta * 13.0) * 0.28 +
+        fbm2D(u * 58.0, theta * 31.0) * 0.14;
 
-      const spiral =
-        Math.sin(
-          u * 155.0 +
-          v * 24.0 +
-          fbm1D(u * 32.0) * 7.0
-        );
+      const wakes =
+        Math.sin(u * 180.0 + theta * 38.0 + fbm2D(u * 15.0, theta * 11.0) * 8.0) * 0.050;
 
-      const fine =
-        Math.sin(u * 2400.0 + fbm1D(v * 40.0) * 4.0) * 0.035 +
-        Math.sin(u * 7100.0 + v * 11.0) * 0.018;
+      const clumps =
+        smoothstep(0.62, 0.92, fbm2D(u * 38.0, theta * 24.0)) *
+        params.ringClumpStrength;
 
-      density *= 1.0 + (largeChaos - 0.5) * params.ringChaos;
-      density += spiral * 0.045 * params.ringSpiralWaves;
-      density += fine;
+      const broadZones =
+        Math.sin(u * 16.0 + fbm2D(theta * 8.0, u * 4.0) * 2.0) * 0.075;
+
+      density *= 1.0 + (macro - 0.5) * params.ringMacroChaos;
+      density += wakes * params.ringSpiralWaves;
+      density += clumps * 0.18;
+      density += broadZones;
+      density += (fbm2D(u * 140.0, theta * 2.8) - 0.5) * 0.08 * params.ringRadialChaos;
+
+      const gapNoise = fbm2D(u * 210.0, theta * 4.0);
+      if (gapNoise > 0.84) density *= 0.62;
 
       density = clamp(density, 0, 1);
 
-      const gapNoise = fbm1D(u * 310.0 + v * 2.0);
+      const iceTint = 0.84 + density * 0.25;
 
-      if (gapNoise > 0.82) {
-        density *= 0.72;
-      }
-
-      const iceTint = 0.88 + density * 0.20;
-
-      const r = 228 * iceTint;
+      const r = 226 * iceTint;
       const g = 222 * iceTint;
-      const b = 210 * iceTint;
+      const b = 211 * iceTint;
       const a = density;
 
       const i = (y * width + x) * 4;
-
       data[i] = clamp(r, 0, 255);
       data[i + 1] = clamp(g, 0, 255);
       data[i + 2] = clamp(b, 0, 255);
@@ -1327,16 +1141,13 @@ function createRingTexture() {
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
-
   const tempCtx = tempCanvas.getContext('2d');
   tempCtx.drawImage(ringCanvas, 0, 0);
 
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(tempCanvas, 0, 0);
-
   ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.filter = 'blur(0.65px)';
+  ctx.globalAlpha = 0.24;
+  ctx.filter = 'blur(0.7px)';
+  ctx.globalCompositeOperation = 'screen';
   ctx.drawImage(tempCanvas, 0, 0);
   ctx.restore();
 
@@ -1353,7 +1164,6 @@ function ringDensityProfile(u) {
   if (u < 0.015 || u > 0.995) return 0;
 
   let d = 0;
-
   d += gaussian(u, 0.12, 0.035, 0.08);
   d += gaussian(u, 0.19, 0.060, 0.16);
   d += gaussian(u, 0.29, 0.055, 0.24);
@@ -1379,128 +1189,272 @@ function ringDensityProfile(u) {
   return clamp(d, 0, 1);
 }
 
-function drawRingShadowOnAtmosphere(ctx, width, height) {
-  const strength = params.ringShadowStrength;
-  const softness = params.ringShadowSoftness;
+function createStars() {
+  if (starField) {
+    scene.remove(starField);
+    starField.geometry.dispose();
+    starField.material.dispose();
+  }
 
-  if (strength <= 0) return;
+  if (!params.showStars || params.starCount <= 0) return;
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'multiply';
+  const positions = new Float32Array(params.starCount * 3);
+  const colors = new Float32Array(params.starCount * 3);
 
-  const shadowBands = [
-    { y: 0.438, h: 8, a: 0.08 },
-    { y: 0.456, h: 16, a: 0.15 },
-    { y: 0.482, h: 32, a: 0.26 },
-    { y: 0.522, h: 18, a: 0.17 },
-    { y: 0.548, h: 9,  a: 0.09 }
-  ];
+  for (let i = 0; i < params.starCount; i++) {
+    const radius = randomRange(280, 850);
+    const theta = randomRange(0, Math.PI * 2);
+    const phi = Math.acos(randomRange(-1, 1));
 
-  for (const band of shadowBands) {
-    const baseY = height * band.y;
-    const bandHeight = band.h * (0.55 + softness);
+    const x = radius * Math.sin(phi) * Math.cos(theta);
+    const y = radius * Math.cos(phi);
+    const z = radius * Math.sin(phi) * Math.sin(theta);
 
-    for (let x = 0; x < width; x += 8) {
-      const u = x / width;
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
 
-      const curve =
-        Math.sin(u * Math.PI * 2.0) * 7.0 +
-        Math.sin(u * Math.PI * 5.0 + 1.2) * 2.5;
+    const base = randomRange(0.65, 1.0);
+    colors[i * 3] = base;
+    colors[i * 3 + 1] = base * randomRange(0.96, 1.0);
+    colors[i * 3 + 2] = base * randomRange(0.90, 1.0);
+  }
 
-      const localY = baseY + curve;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-      const g = ctx.createLinearGradient(
-        0,
-        localY - bandHeight,
-        0,
-        localY + bandHeight
-      );
+  const material = new THREE.PointsMaterial({
+    size: params.starSize * 10,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false
+  });
 
-      g.addColorStop(0.0, 'rgba(0,0,0,0)');
-      g.addColorStop(0.45, `rgba(0,0,0,${band.a * strength})`);
-      g.addColorStop(0.55, `rgba(0,0,0,${band.a * strength})`);
-      g.addColorStop(1.0, 'rgba(0,0,0,0)');
+  starField = new THREE.Points(geometry, material);
+  scene.add(starField);
+}
 
-      ctx.fillStyle = g;
-      ctx.fillRect(x, localY - bandHeight, 9, bandHeight * 2);
+function rebuildPlanetMaps() {
+  const { colorMap } = createSaturnMaps();
+
+  if (planetMesh?.material?.uniforms?.uMap?.value) {
+    planetMesh.material.uniforms.uMap.value.dispose();
+  }
+
+  planetMesh.material.uniforms.uMap.value = colorMap;
+  planetMesh.material.needsUpdate = true;
+
+  if (cloudMesh?.material?.map) {
+    cloudMesh.material.map.dispose();
+  }
+
+  cloudMesh.material.map = createCloudTexture();
+  cloudMesh.material.needsUpdate = true;
+
+  updateScene();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+
+  if (planetMesh) {
+    planetMesh.rotation.y += params.planetSpinSpeed * dt;
+  }
+
+  if (cloudMesh) {
+    cloudMesh.rotation.y += params.cloudSpeed * dt;
+  }
+
+  controls.update();
+  updatePlanetShaderUniforms();
+
+  renderer.render(scene, camera);
+}
+
+function captureByCurrentMode() {
+  if (params.sceneProfile === 'iPhone 17 Pro Max da Terra') {
+    capturePreset('iphone17pm');
+    return;
+  }
+
+  if (params.sceneProfile === 'Modo Livre') {
+    captureFree();
+    return;
+  }
+
+  capturePreset('4k');
+}
+
+function capturePreset(type) {
+  if (type === '4k') {
+    captureImage(3840, 2160, 'Isomium_Saturn_3840x2160.png');
+    return;
+  }
+
+  if (type === 'vertical4k') {
+    captureImage(2160, 3840, 'Isomium_Saturn_2160x3840.png');
+    return;
+  }
+
+  if (type === 'square4096') {
+    captureImage(4096, 4096, 'Isomium_Saturn_4096x4096.png');
+    return;
+  }
+
+  if (type === 'iphone17pm') {
+    if (params.phoneOrientation === 'Horizontal') {
+      captureImage(2868, 1320, 'Isomium_Saturn_iPhone17ProMax_Landscape.png');
+    } else {
+      captureImage(1320, 2868, 'Isomium_Saturn_iPhone17ProMax_Portrait.png');
     }
   }
-
-  ctx.restore();
 }
 
-/* =========================================================
-   HELPERS
-========================================================= */
+function captureFree() {
+  const width = Math.max(320, Math.floor(params.freeWidth));
+  const height = Math.max(320, Math.floor(params.freeHeight));
+  captureImage(width, height, `Isomium_Saturn_${width}x${height}.png`);
+}
 
-function fixRingUV(geometry, innerRadius, outerRadius) {
-  const position = geometry.attributes.position;
-  const uv = geometry.attributes.uv;
-  const vector = new THREE.Vector3();
+async function captureImage(width, height, fileName) {
+  showCaptureStatus(`Renderizando ${width} × ${height}...`);
 
-  for (let i = 0; i < position.count; i++) {
-    vector.fromBufferAttribute(position, i);
+  triggerFlash();
 
-    const radius = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
-    const radial = (radius - innerRadius) / (outerRadius - innerRadius);
+  const oldPixelRatio = renderer.getPixelRatio();
+  const oldSize = renderer.getSize(new THREE.Vector2());
+  const oldAspect = camera.aspect;
+  const wasPhoneVisible = phonePreviewEl.classList.contains('active');
+  const uiWasHidden = document.body.classList.contains('ui-hidden');
 
-    const angle = Math.atan2(vector.y, vector.x);
-    const azimuth = (angle + Math.PI) / (Math.PI * 2);
+  phonePreviewEl.classList.remove('active');
+  document.body.classList.add('ui-hidden');
 
-    uv.setXY(i, radial, azimuth);
+  renderer.setPixelRatio(1);
+  renderer.setSize(width, height, false);
+
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+
+  renderer.render(scene, camera);
+
+  const dataURL = renderer.domElement.toDataURL('image/png', 1.0);
+  downloadDataURL(dataURL, fileName);
+
+  renderer.setPixelRatio(oldPixelRatio);
+  renderer.setSize(oldSize.x, oldSize.y, false);
+
+  camera.aspect = oldAspect;
+  camera.updateProjectionMatrix();
+
+  if (!uiWasHidden) {
+    document.body.classList.remove('ui-hidden');
   }
 
-  uv.needsUpdate = true;
-}
-
-function drawIrregularHexagon(ctx, cx, cy, r, irregularity = 0.18) {
-  const points = 6;
-
-  for (let i = 0; i < points; i++) {
-    const angle = Math.PI / 3 * i - Math.PI / 6;
-    const noise = 1.0 + (pseudoNoise1D(i * 13.17 + r * 0.01) - 0.5) * irregularity;
-
-    const x = cx + Math.cos(angle) * r * noise;
-    const y = cy + Math.sin(angle) * r * noise;
-
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  if (wasPhoneVisible) {
+    phonePreviewEl.classList.add('active');
   }
 
-  ctx.closePath();
+  hideCaptureStatus();
 }
 
-function fbm1D(x) {
+function triggerFlash() {
+  flashEl.style.opacity = '1';
+  setTimeout(() => {
+    flashEl.style.opacity = '0';
+  }, 90);
+}
+
+function showCaptureStatus(text) {
+  captureStatusEl.textContent = text;
+  captureStatusEl.style.display = 'block';
+}
+
+function hideCaptureStatus() {
+  setTimeout(() => {
+    captureStatusEl.style.display = 'none';
+  }, 350);
+}
+
+function downloadDataURL(dataURL, fileName) {
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function onWindowResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function track(controller) {
+  guiControllers.push(controller);
+  return controller;
+}
+
+function refreshGui() {
+  for (const controller of guiControllers) {
+    controller.updateDisplay();
+  }
+}
+
+function disposeMaterial(material) {
+  if (!material) return;
+
+  if (material.map) material.map.dispose();
+  if (material.alphaMap) material.alphaMap.dispose();
+  material.dispose();
+}
+
+/* ---------------------- Helpers matemáticos ---------------------- */
+
+function gaussian(x, mean, sigma, amp) {
+  return amp * Math.exp(-((x - mean) ** 2) / (2 * sigma * sigma));
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function fract(value) {
+  return value - Math.floor(value);
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function pseudoNoise2D(x, y) {
+  return fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453123);
+}
+
+function fbm2D(x, y) {
   let value = 0;
   let amplitude = 0.5;
   let frequency = 1.0;
 
   for (let i = 0; i < 5; i++) {
-    value += amplitude * pseudoNoise1D(x * frequency);
-    frequency *= 2.03;
+    value += amplitude * pseudoNoise2D(x * frequency, y * frequency);
+    frequency *= 2.02;
     amplitude *= 0.52;
   }
 
   return value;
 }
 
-function gaussian(x, mean, sigma, amplitude) {
-  const exponent = -((x - mean) * (x - mean)) / (2 * sigma * sigma);
-  return amplitude * Math.exp(exponent);
-}
-
-function pseudoNoise1D(x) {
-  return fract(Math.sin(x * 12.9898) * 43758.5453123);
-}
-
-function fract(n) {
-  return n - Math.floor(n);
-}
-
 function randomRange(min, max) {
   return min + Math.random() * (max - min);
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
