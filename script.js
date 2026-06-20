@@ -222,15 +222,16 @@ function createAtmosphereGlow() {
       uLightDirection: { value: new THREE.Vector3().copy(sunLight.position).normalize() }
     },
     vertexShader: `
-      varying vec3 vWorldNormal;
+      varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldNormal;
 
       void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
-        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vNormal = normalize(normalMatrix * normal);
         vViewPosition = -mvPosition.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
 
         gl_Position = projectionMatrix * mvPosition;
       }
@@ -241,18 +242,20 @@ function createAtmosphereGlow() {
       uniform vec3 uColor;
       uniform vec3 uLightDirection;
 
-      varying vec3 vWorldNormal;
+      varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldNormal;
 
       void main() {
-        vec3 normal = normalize(vWorldNormal);
+        vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
+        vec3 worldNormal = normalize(vWorldNormal);
         vec3 lightDir = normalize(uLightDirection);
 
-        float rim = 1.0 - max(dot(normalize(normalMatrix * normal), viewDir), 0.0);
+        float rim = 1.0 - max(dot(normal, viewDir), 0.0);
         rim = pow(rim, uPower);
 
-        float lightSide = smoothstep(-0.15, 0.65, dot(normal, lightDir));
+        float lightSide = smoothstep(-0.20, 0.65, dot(worldNormal, lightDir));
 
         float alpha = rim * lightSide * uGlowIntensity;
 
