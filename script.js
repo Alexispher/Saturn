@@ -40,6 +40,7 @@ let guiControllers = [];
 const params = {
   sceneProfile: 'Missão Cassini',
   captureProfile: 'Missão Cassini',
+
   phoneOrientation: 'Vertical',
   showPhoneFrame: false,
   keepPhoneGuideInFreeMode: false,
@@ -52,11 +53,11 @@ const params = {
   frameRotationZ: -8,
   subjectScale: 1.0,
 
-  // Modo câmera
+  // Câmera / look
+  cameraMono: false,
   sensorNoise: 0.014,
   vignette: 0.20,
   bloomMin: 0.025,
-  iphoneEarthRealism: 0.90,
 
   // Saturno
   polarFlattening: 0.902,
@@ -120,6 +121,7 @@ const PROFILE_PRESETS = {
     frameRotationZ: -8,
     subjectScale: 1.0,
 
+    cameraMono: false,
     sensorNoise: 0.014,
     vignette: 0.20,
     bloomMin: 0.025,
@@ -173,6 +175,7 @@ const PROFILE_PRESETS = {
     frameRotationZ: 0,
     subjectScale: 0.085,
 
+    cameraMono: false,
     sensorNoise: 0.050,
     vignette: 0.32,
     bloomMin: 0.055,
@@ -215,58 +218,119 @@ const PROFILE_PRESETS = {
     showStars: true
   },
 
-  'Modo Livre': {
+  'Wallpaper Isomium': {
     showPhoneFrame: false,
     phoneOrientation: 'Vertical',
 
-    fov: 26,
-    distance: 18,
-    offsetX: 0,
-    offsetY: 0,
-    frameRotationZ: -4,
-    subjectScale: 1.0,
+    fov: 23.5,
+    distance: 15.0,
+    offsetX: -5.15,
+    offsetY: 0.12,
+    frameRotationZ: 0,
+    subjectScale: 1.48,
 
-    sensorNoise: 0.012,
-    vignette: 0.16,
-    bloomMin: 0.020,
+    cameraMono: true,
+    sensorNoise: 0.004,
+    vignette: 0.08,
+    bloomMin: 0.008,
 
     polarFlattening: 0.902,
-    planetBrightness: 1.08,
-    bandVisibility: 0.70,
-    terminatorSoftness: 0.36,
-    cloudOpacity: 0.09,
-    cloudSpeed: 0.01,
-    planetSpinSpeed: 0.006,
-    showHexagonHint: true,
-    hexagonStrength: 0.08,
+    planetBrightness: 0.96,
+    bandVisibility: 0.38,
+    terminatorSoftness: 0.26,
+    cloudOpacity: 0.02,
+    cloudSpeed: 0.001,
+    planetSpinSpeed: 0.0005,
+    showHexagonHint: false,
+    hexagonStrength: 0.0,
 
-    atmosphereGlow: 0.26,
-    atmospherePower: 3.0,
-    atmosphereScale: 1.025,
-    limbIrregularity: 0.14,
+    atmosphereGlow: 0.17,
+    atmospherePower: 4.0,
+    atmosphereScale: 1.016,
+    limbIrregularity: 0.06,
 
-    physicalRingShadow: 0.54,
+    physicalRingShadow: 0.42,
     ringShadowSharpness: 0.72,
 
-    ringTilt: 72.5,
-    ringOpacity: 0.86,
-    ringBrightness: 0.92,
-    ringMacroChaos: 0.68,
-    ringClumpStrength: 0.40,
-    ringRadialChaos: 0.50,
-    ringSpiralWaves: 0.48,
+    ringTilt: 73.8,
+    ringOpacity: 0.97,
+    ringBrightness: 1.16,
+    ringMacroChaos: 0.88,
+    ringClumpStrength: 0.62,
+    ringRadialChaos: 0.72,
+    ringSpiralWaves: 0.56,
 
-    lightX: 6.4,
-    lightY: 4.0,
-    lightZ: 13.2,
-    lightIntensity: 3.0,
+    lightX: 7.8,
+    lightY: 2.1,
+    lightZ: 17.2,
+    lightIntensity: 2.75,
     ambientIntensity: 0.0,
 
-    exposure: 1.03,
-    starCount: 45,
-    starSize: 0.028,
-    showStars: true
+    exposure: 0.94,
+    starCount: 0,
+    starSize: 0.018,
+    showStars: false,
+
+    freeWidth: 4096,
+    freeHeight: 4096
   }
+};
+
+const FREE_DEFAULTS = {
+  showPhoneFrame: false,
+  phoneOrientation: 'Vertical',
+
+  fov: 26,
+  distance: 18,
+  offsetX: 0,
+  offsetY: 0,
+  frameRotationZ: -4,
+  subjectScale: 1.0,
+
+  cameraMono: false,
+  sensorNoise: 0.012,
+  vignette: 0.16,
+  bloomMin: 0.020,
+
+  polarFlattening: 0.902,
+  planetBrightness: 1.08,
+  bandVisibility: 0.70,
+  terminatorSoftness: 0.36,
+  cloudOpacity: 0.09,
+  cloudSpeed: 0.01,
+  planetSpinSpeed: 0.006,
+  showHexagonHint: true,
+  hexagonStrength: 0.08,
+
+  atmosphereGlow: 0.26,
+  atmospherePower: 3.0,
+  atmosphereScale: 1.025,
+  limbIrregularity: 0.14,
+
+  physicalRingShadow: 0.54,
+  ringShadowSharpness: 0.72,
+
+  ringTilt: 72.5,
+  ringOpacity: 0.86,
+  ringBrightness: 0.92,
+  ringMacroChaos: 0.68,
+  ringClumpStrength: 0.40,
+  ringRadialChaos: 0.50,
+  ringSpiralWaves: 0.48,
+
+  lightX: 6.4,
+  lightY: 4.0,
+  lightZ: 13.2,
+  lightIntensity: 3.0,
+  ambientIntensity: 0.0,
+
+  exposure: 1.03,
+  starCount: 45,
+  starSize: 0.028,
+  showStars: true,
+
+  freeWidth: 3000,
+  freeHeight: 3000
 };
 
 init();
@@ -289,6 +353,7 @@ function init() {
     canvas,
     antialias: true,
     alpha: false,
+    preserveDrawingBuffer: true,
     powerPreference: 'high-performance'
   });
 
@@ -300,12 +365,13 @@ function init() {
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.enablePan = false;
-  controls.minDistance = 6;
-  controls.maxDistance = 220;
+  controls.enablePan = true;
+  controls.minDistance = 4;
+  controls.maxDistance = 240;
 
   saturnGroup = new THREE.Group();
   ringGroup = new THREE.Group();
+
   saturnGroup.add(ringGroup);
   scene.add(saturnGroup);
 
@@ -323,8 +389,8 @@ function init() {
 
   createGui();
   bindHud();
-  applySceneProfile('Missão Cassini');
-  updateScene();
+
+  applySceneProfile('Missão Cassini', { forcePreset: true });
 
   window.addEventListener('resize', onWindowResize);
   window.addEventListener('keydown', onKeyDown);
@@ -334,7 +400,8 @@ function createGui() {
   gui = new GUI({ title: 'SATURN MODE' });
 
   const actions = {
-    'Aplicar perfil': () => applySceneProfile(params.sceneProfile),
+    'Aplicar perfil': () => applySceneProfile(params.sceneProfile, { forcePreset: true }),
+    'Resetar modo atual': () => resetCurrentMode(),
     'Capturar 3840x2160': () => capturePreset('4k'),
     'Capturar 2160x3840': () => capturePreset('vertical4k'),
     'Capturar 4096x4096': () => capturePreset('square4096'),
@@ -343,72 +410,80 @@ function createGui() {
   };
 
   const folderMode = gui.addFolder('Modo');
+
   track(folderMode.add(params, 'sceneProfile', [
     'Missão Cassini',
     'iPhone 17 Pro Max da Terra',
+    'Wallpaper Isomium',
     'Modo Livre'
   ]).name('Perfil').onChange((value) => applySceneProfile(value)));
+
   track(folderMode.add(params, 'showPhoneFrame').name('Mostrar guia celular').onChange(updatePhonePreview));
   track(folderMode.add(params, 'phoneOrientation', ['Vertical', 'Horizontal']).name('Orientação celular').onChange(updatePhonePreview));
+  track(folderMode.add(params, 'keepPhoneGuideInFreeMode').name('Guia no Livre').onChange(updatePhonePreview));
   track(folderMode.add(actions, 'Aplicar perfil'));
+  track(folderMode.add(actions, 'Resetar modo atual'));
 
   const folderComp = gui.addFolder('Composição');
-  track(folderComp.add(params, 'fov', 5, 60, 0.1).name('FOV').onChange(applyCameraFromParams));
-  track(folderComp.add(params, 'distance', 6, 220, 0.1).name('Distância').onChange(applyCameraFromParams));
-  track(folderComp.add(params, 'offsetX', -20, 20, 0.01).name('Offset X').onChange(applyCameraFromParams));
-  track(folderComp.add(params, 'offsetY', -20, 20, 0.01).name('Offset Y').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'fov', 5, 80, 0.1).name('FOV').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'distance', 4, 240, 0.1).name('Distância').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'offsetX', -40, 40, 0.01).name('Offset X').onChange(applyCameraFromParams));
+  track(folderComp.add(params, 'offsetY', -40, 40, 0.01).name('Offset Y').onChange(applyCameraFromParams));
   track(folderComp.add(params, 'frameRotationZ', -180, 180, 0.1).name('Rotação quadro').onChange(updateScene));
-  track(folderComp.add(params, 'subjectScale', 0.02, 3.0, 0.001).name('Escala assunto').onChange(updateScene));
+  track(folderComp.add(params, 'subjectScale', 0.01, 5.0, 0.001).name('Escala assunto').onChange(updateScene));
 
   const folderSaturn = gui.addFolder('Saturno');
-  track(folderSaturn.add(params, 'polarFlattening', 0.82, 1.0, 0.001).name('Achatamento polar').onChange(updateScene));
-  track(folderSaturn.add(params, 'planetBrightness', 0.2, 2.0, 0.01).name('Brilho').onChange(updateScene));
-  track(folderSaturn.add(params, 'bandVisibility', 0, 1.5, 0.01).name('Bandas visíveis').onChange(updateScene));
-  track(folderSaturn.add(params, 'terminatorSoftness', 0.02, 1.0, 0.01).name('Suavidade terminador').onChange(updateScene));
-  track(folderSaturn.add(params, 'cloudOpacity', 0, 0.4, 0.01).name('Opac. nuvens').onChange(updateScene));
-  track(folderSaturn.add(params, 'cloudSpeed', 0, 0.08, 0.001).name('Rot. nuvens').onChange(updateScene));
-  track(folderSaturn.add(params, 'planetSpinSpeed', 0, 0.05, 0.001).name('Rot. planeta').onChange(updateScene));
-  track(folderSaturn.add(params, 'showHexagonHint').name('Hexágono polar').onChange(() => rebuildPlanetMaps()));
-  track(folderSaturn.add(params, 'hexagonStrength', 0, 0.35, 0.01).name('Força hexágono').onChange(() => rebuildPlanetMaps()));
+  track(folderSaturn.add(params, 'polarFlattening', 0.75, 1.05, 0.001).name('Achatamento polar').onChange(updateScene));
+  track(folderSaturn.add(params, 'planetBrightness', 0.05, 3.0, 0.01).name('Brilho').onChange(updateScene));
+  track(folderSaturn.add(params, 'bandVisibility', 0, 2.5, 0.01).name('Bandas visíveis').onChange(updateScene));
+  track(folderSaturn.add(params, 'terminatorSoftness', 0.01, 1.5, 0.01).name('Suavidade terminador').onChange(updateScene));
+  track(folderSaturn.add(params, 'cloudOpacity', 0, 0.8, 0.01).name('Opac. nuvens').onChange(updateScene));
+  track(folderSaturn.add(params, 'cloudSpeed', 0, 0.12, 0.001).name('Rot. nuvens'));
+  track(folderSaturn.add(params, 'planetSpinSpeed', 0, 0.08, 0.001).name('Rot. planeta'));
+  track(folderSaturn.add(params, 'showHexagonHint').name('Hexágono polar').onChange(rebuildPlanetMaps));
+  track(folderSaturn.add(params, 'hexagonStrength', 0, 0.8, 0.01).name('Força hexágono').onChange(rebuildPlanetMaps));
 
   const folderAtmosphere = gui.addFolder('Atmosfera');
-  track(folderAtmosphere.add(params, 'atmosphereGlow', 0, 1.0, 0.01).name('Rim glow').onChange(updateScene));
-  track(folderAtmosphere.add(params, 'atmospherePower', 1.0, 6.0, 0.01).name('Queda glow').onChange(updateScene));
-  track(folderAtmosphere.add(params, 'atmosphereScale', 1.0, 1.08, 0.001).name('Escala atmosfera').onChange(updateScene));
-  track(folderAtmosphere.add(params, 'limbIrregularity', 0, 0.5, 0.01).name('Irregularidade limbo').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'atmosphereGlow', 0, 2.0, 0.01).name('Rim glow').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'atmospherePower', 0.5, 8.0, 0.01).name('Queda glow').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'atmosphereScale', 1.0, 1.15, 0.001).name('Escala atmosfera').onChange(updateScene));
+  track(folderAtmosphere.add(params, 'limbIrregularity', 0, 1.0, 0.01).name('Irregularidade limbo').onChange(updateScene));
 
   const folderShadow = gui.addFolder('Sombra dos Anéis');
-  track(folderShadow.add(params, 'physicalRingShadow', 0, 1.2, 0.01).name('Sombra física').onChange(updateScene));
-  track(folderShadow.add(params, 'ringShadowSharpness', 0.05, 1.5, 0.01).name('Nitidez física').onChange(updateScene));
+  track(folderShadow.add(params, 'physicalRingShadow', 0, 2.0, 0.01).name('Sombra física').onChange(updateScene));
+  track(folderShadow.add(params, 'ringShadowSharpness', 0.02, 2.0, 0.01).name('Nitidez física').onChange(updateScene));
 
   const folderRings = gui.addFolder('Anéis');
+  track(folderRings.add(params, 'ringInnerRadius', 4.0, 14.0, 0.01).name('Raio interno').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringOuterRadius', 6.0, 24.0, 0.01).name('Raio externo').onFinishChange(buildRingMesh));
   track(folderRings.add(params, 'ringTilt', 0, 89, 0.1).name('Inclinação').onChange(updateScene));
   track(folderRings.add(params, 'ringOpacity', 0, 1.0, 0.01).name('Opacidade').onChange(updateScene));
-  track(folderRings.add(params, 'ringBrightness', 0.2, 1.5, 0.01).name('Brilho').onChange(updateScene));
-  track(folderRings.add(params, 'ringMacroChaos', 0, 1.5, 0.01).name('Caos macro').onFinishChange(buildRingMesh));
-  track(folderRings.add(params, 'ringClumpStrength', 0, 1.0, 0.01).name('Aglomerados').onFinishChange(buildRingMesh));
-  track(folderRings.add(params, 'ringRadialChaos', 0, 1.0, 0.01).name('Caos radial').onFinishChange(buildRingMesh));
-  track(folderRings.add(params, 'ringSpiralWaves', 0, 1.0, 0.01).name('Ondas').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringBrightness', 0.05, 2.5, 0.01).name('Brilho').onChange(updateScene));
+  track(folderRings.add(params, 'ringMacroChaos', 0, 2.0, 0.01).name('Caos macro').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringClumpStrength', 0, 1.5, 0.01).name('Aglomerados').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringRadialChaos', 0, 1.5, 0.01).name('Caos radial').onFinishChange(buildRingMesh));
+  track(folderRings.add(params, 'ringSpiralWaves', 0, 1.5, 0.01).name('Ondas').onFinishChange(buildRingMesh));
 
   const folderLight = gui.addFolder('Luz');
-  track(folderLight.add(params, 'lightX', -50, 50, 0.1).name('Luz X').onChange(updateScene));
-  track(folderLight.add(params, 'lightY', -50, 50, 0.1).name('Luz Y').onChange(updateScene));
-  track(folderLight.add(params, 'lightZ', -50, 50, 0.1).name('Luz Z').onChange(updateScene));
-  track(folderLight.add(params, 'lightIntensity', 0, 8.0, 0.01).name('Intensidade').onChange(updateScene));
-  track(folderLight.add(params, 'ambientIntensity', 0, 1.0, 0.001).name('Luz ambiente').onChange(updateScene));
+  track(folderLight.add(params, 'lightX', -80, 80, 0.1).name('Luz X').onChange(updateScene));
+  track(folderLight.add(params, 'lightY', -80, 80, 0.1).name('Luz Y').onChange(updateScene));
+  track(folderLight.add(params, 'lightZ', -80, 80, 0.1).name('Luz Z').onChange(updateScene));
+  track(folderLight.add(params, 'lightIntensity', 0, 12.0, 0.01).name('Intensidade').onChange(updateScene));
+  track(folderLight.add(params, 'ambientIntensity', 0, 2.0, 0.001).name('Luz ambiente').onChange(updateScene));
 
-  const folderRender = gui.addFolder('Render');
-  track(folderRender.add(params, 'exposure', 0.2, 2.4, 0.01).name('Exposição').onChange(updateScene));
-  track(folderRender.add(params, 'sensorNoise', 0, 0.20, 0.001).name('Ruído sensor').onChange(updateScene));
-  track(folderRender.add(params, 'vignette', 0, 1.0, 0.01).name('Vinheta').onChange(updateScene));
-  track(folderRender.add(params, 'bloomMin', 0, 0.25, 0.001).name('Bloom mínimo').onChange(updateScene));
+  const folderRender = gui.addFolder('Render / Câmera');
+  track(folderRender.add(params, 'cameraMono').name('Preto e branco').onChange(updateScene));
+  track(folderRender.add(params, 'exposure', 0.1, 3.5, 0.01).name('Exposição').onChange(updateScene));
+  track(folderRender.add(params, 'sensorNoise', 0, 0.25, 0.001).name('Ruído sensor'));
+  track(folderRender.add(params, 'vignette', 0, 1.2, 0.01).name('Vinheta'));
+  track(folderRender.add(params, 'bloomMin', 0, 0.35, 0.001).name('Bloom mínimo'));
   track(folderRender.add(params, 'showStars').name('Mostrar estrelas').onChange(updateScene));
-  track(folderRender.add(params, 'starCount', 0, 1000, 1).name('Qtd estrelas').onFinishChange(createStars));
-  track(folderRender.add(params, 'starSize', 0.002, 0.08, 0.001).name('Tam. estrelas').onFinishChange(createStars));
+  track(folderRender.add(params, 'starCount', 0, 2000, 1).name('Qtd estrelas').onFinishChange(createStars));
+  track(folderRender.add(params, 'starSize', 0.001, 0.12, 0.001).name('Tam. estrelas').onFinishChange(createStars));
 
   const folderCapture = gui.addFolder('Captura Livre');
-  track(folderCapture.add(params, 'freeWidth', 320, 10000, 1).name('Largura'));
-  track(folderCapture.add(params, 'freeHeight', 320, 10000, 1).name('Altura'));
+  track(folderCapture.add(params, 'freeWidth', 320, 12000, 1).name('Largura'));
+  track(folderCapture.add(params, 'freeHeight', 320, 12000, 1).name('Altura'));
 
   const folderActions = gui.addFolder('Ações');
   track(folderActions.add(actions, 'Capturar 3840x2160'));
@@ -416,28 +491,31 @@ function createGui() {
   track(folderActions.add(actions, 'Capturar 4096x4096'));
   track(folderActions.add(actions, 'Capturar iPhone 17 PM'));
   track(folderActions.add(actions, 'Capturar Livre'));
+
+  folderMode.open();
+  folderComp.open();
+  folderActions.open();
 }
 
 function bindHud() {
-  btnToggleUI.addEventListener('click', toggleUI);
+  btnToggleUI?.addEventListener('click', toggleUI);
+  btnExport4K?.addEventListener('click', () => capturePreset('4k'));
+  btnExportVertical?.addEventListener('click', () => capturePreset('vertical4k'));
+  btnExportSquare?.addEventListener('click', () => capturePreset('square4096'));
+  btnExportIphone?.addEventListener('click', () => capturePreset('iphone17pm'));
+  btnExportFree?.addEventListener('click', captureFree);
 
-  btnExport4K.addEventListener('click', () => capturePreset('4k'));
-  btnExportVertical.addEventListener('click', () => capturePreset('vertical4k'));
-  btnExportSquare.addEventListener('click', () => capturePreset('square4096'));
-  btnExportIphone.addEventListener('click', () => capturePreset('iphone17pm'));
-  btnExportFree.addEventListener('click', captureFree);
-
-  btnReset.addEventListener('click', () => {
-    applySceneProfile(params.sceneProfile || 'Missão Cassini');
-  });
+  btnReset?.addEventListener('click', resetCurrentMode);
 }
 
 function onKeyDown(event) {
-  if (event.key.toLowerCase() === 'h') {
+  const key = event.key.toLowerCase();
+
+  if (key === 'h') {
     toggleUI();
   }
 
-  if (event.key.toLowerCase() === 'p') {
+  if (key === 'p') {
     captureByCurrentMode();
   }
 }
@@ -446,20 +524,33 @@ function toggleUI() {
   document.body.classList.toggle('ui-hidden');
 }
 
-function applySceneProfile(name) {
+function applySceneProfile(name, options = {}) {
+  params.sceneProfile = name;
+
+  if (name === 'Modo Livre') {
+    params.captureProfile = 'Modo Livre';
+
+    if (!params.keepPhoneGuideInFreeMode) {
+      params.showPhoneFrame = false;
+    }
+
+    updateScene();
+    updatePhonePreview();
+    refreshGui();
+    return;
+  }
+
   const preset = PROFILE_PRESETS[name];
-  if (!preset) return;
+
+  if (!preset) {
+    updateScene();
+    refreshGui();
+    return;
+  }
 
   Object.assign(params, preset);
   params.sceneProfile = name;
-
-  if (name === 'Missão Cassini') {
-    params.captureProfile = 'Missão Cassini';
-  } else if (name === 'iPhone 17 Pro Max da Terra') {
-    params.captureProfile = 'iPhone 17 Pro Max da Terra';
-  } else {
-    params.captureProfile = 'Modo Livre';
-  }
+  params.captureProfile = name;
 
   rebuildPlanetMaps();
   buildRingMesh();
@@ -468,6 +559,25 @@ function applySceneProfile(name) {
   updateScene();
   updatePhonePreview();
   refreshGui();
+}
+
+function resetCurrentMode() {
+  if (params.sceneProfile === 'Modo Livre') {
+    Object.assign(params, FREE_DEFAULTS);
+    params.sceneProfile = 'Modo Livre';
+    params.captureProfile = 'Modo Livre';
+
+    rebuildPlanetMaps();
+    buildRingMesh();
+    createStars();
+    applyCameraFromParams();
+    updateScene();
+    updatePhonePreview();
+    refreshGui();
+    return;
+  }
+
+  applySceneProfile(params.sceneProfile || 'Missão Cassini', { forcePreset: true });
 }
 
 function applyCameraFromParams() {
@@ -483,11 +593,14 @@ function applyCameraFromParams() {
 function updateScene() {
   renderer.toneMappingExposure = params.exposure;
 
+  canvas.style.filter = params.cameraMono ? 'grayscale(1)' : 'none';
+
   saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.frameRotationZ);
   saturnGroup.scale.setScalar(params.subjectScale);
 
   sunLight.position.set(params.lightX, params.lightY, params.lightZ);
   sunLight.intensity = params.lightIntensity;
+
   ambientLight.intensity = params.ambientIntensity;
 
   if (planetMesh) {
@@ -528,7 +641,13 @@ function updateScene() {
 }
 
 function updatePhonePreview() {
-  if (params.showPhoneFrame) {
+  if (!phonePreviewEl) return;
+
+  const shouldShow =
+    params.showPhoneFrame ||
+    (params.sceneProfile === 'Modo Livre' && params.keepPhoneGuideInFreeMode && params.showPhoneFrame);
+
+  if (shouldShow) {
     phonePreviewEl.classList.add('active');
   } else {
     phonePreviewEl.classList.remove('active');
@@ -572,8 +691,6 @@ function createPlanet() {
       varying vec2 vUv;
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
-      varying vec3 vViewPosition;
-      varying vec3 vViewNormal;
 
       void main() {
         vUv = uv;
@@ -582,11 +699,7 @@ function createPlanet() {
         vWorldPosition = worldPosition.xyz;
         vWorldNormal = normalize(mat3(modelMatrix) * normal);
 
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        vViewNormal = normalize(normalMatrix * normal);
-
-        gl_Position = projectionMatrix * mvPosition;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
 
@@ -610,8 +723,6 @@ function createPlanet() {
       varying vec2 vUv;
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
-      varying vec3 vViewPosition;
-      varying vec3 vViewNormal;
 
       float hash(float n) {
         return fract(sin(n) * 43758.5453123);
@@ -655,15 +766,20 @@ function createPlanet() {
         if (u < 0.015 || u > 0.995) return 0.0;
 
         float d = 0.0;
+
         d += gaussian(u, 0.12, 0.035, 0.08);
         d += gaussian(u, 0.19, 0.060, 0.16);
         d += gaussian(u, 0.29, 0.055, 0.24);
+
         d += gaussian(u, 0.43, 0.075, 0.78);
         d += gaussian(u, 0.54, 0.060, 0.96);
         d += gaussian(u, 0.62, 0.050, 0.86);
+
         d -= gaussian(u, 0.705, 0.020, 0.95);
+
         d += gaussian(u, 0.77, 0.050, 0.54);
         d += gaussian(u, 0.85, 0.040, 0.42);
+
         d += gaussian(u, 0.915, 0.009, 0.24);
         d += gaussian(u, 0.953, 0.016, 0.09);
 
@@ -686,19 +802,23 @@ function createPlanet() {
         if (abs(denom) < 0.001) return 0.0;
 
         float t = -dot(ringNormal, relPos) / denom;
+
         if (t <= 0.0) return 0.0;
 
         vec3 hitPoint = relPos + lightDir * t;
         float radius = length(hitPoint);
 
         float u = (radius - uRingInner) / (uRingOuter - uRingInner);
+
         if (u < 0.0 || u > 1.0) return 0.0;
 
         float density = ringDensity(u);
         float n = fbm(vec2(u * 22.0, hitPoint.x * 0.4 + hitPoint.z * 0.4));
+
         density *= mix(0.72, 1.18, n);
 
         float shadow = smoothstep(0.02, uRingShadowSharpness, density);
+
         return shadow * uPhysicalRingShadow;
       }
 
@@ -753,6 +873,7 @@ function createPlanet() {
 
   planetMesh = new THREE.Mesh(geometry, material);
   planetMesh.scale.set(1, params.polarFlattening, 1);
+
   saturnGroup.add(planetMesh);
 
   updatePlanetShaderUniforms();
@@ -771,6 +892,7 @@ function createCloudLayer() {
 
   cloudMesh = new THREE.Mesh(geometry, material);
   cloudMesh.scale.set(1.002, params.polarFlattening * 1.004, 1.002);
+
   saturnGroup.add(cloudMesh);
 }
 
@@ -800,6 +922,7 @@ function createAtmosphereGlow() {
         vUv = uv;
 
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+
         vNormal = normalize(normalMatrix * normal);
         vViewPosition = -mvPosition.xyz;
         vWorldNormal = normalize(mat3(modelMatrix) * normal);
@@ -865,6 +988,7 @@ function createAtmosphereGlow() {
   });
 
   atmosphereMesh = new THREE.Mesh(geometry, material);
+
   atmosphereMesh.scale.set(
     params.atmosphereScale,
     params.polarFlattening * params.atmosphereScale,
@@ -883,6 +1007,7 @@ function updatePlanetShaderUniforms() {
   uniforms.uLightDirection.value.copy(sunLight.position).normalize();
 
   const ringNormal = new THREE.Vector3(0, 0, 1);
+
   if (ringGroup) {
     ringGroup.updateWorldMatrix(true, false);
     ringNormal.applyQuaternion(ringGroup.getWorldQuaternion(new THREE.Quaternion()));
@@ -907,8 +1032,8 @@ function createSaturnMaps() {
   const mapCanvas = document.createElement('canvas');
   mapCanvas.width = width;
   mapCanvas.height = height;
-  const ctx = mapCanvas.getContext('2d');
 
+  const ctx = mapCanvas.getContext('2d');
   const img = ctx.createImageData(width, height);
   const data = img.data;
 
@@ -927,6 +1052,7 @@ function createSaturnMaps() {
       bands += (fbm2D(u * 6.0, v * 18.0) - 0.5) * 0.045;
 
       const polarFade = smoothstep(0.15, 0.95, Math.abs(lat));
+
       const baseR = 0.92 - polarFade * 0.06;
       const baseG = 0.86 - polarFade * 0.06;
       const baseB = 0.72 - polarFade * 0.05;
@@ -938,6 +1064,7 @@ function createSaturnMaps() {
       if (params.showHexagonHint && v < 0.20) {
         const cx = 0.5;
         const cy = 0.10;
+
         const dx = u - cx;
         const dy = v - cy;
 
@@ -953,6 +1080,7 @@ function createSaturnMaps() {
       }
 
       const i = (y * width + x) * 4;
+
       data[i] = clamp(r * 255, 0, 255);
       data[i + 1] = clamp(g * 255, 0, 255);
       data[i + 2] = clamp(b * 255, 0, 255);
@@ -978,8 +1106,8 @@ function createCloudTexture() {
   const cloudCanvas = document.createElement('canvas');
   cloudCanvas.width = width;
   cloudCanvas.height = height;
-  const ctx = cloudCanvas.getContext('2d');
 
+  const ctx = cloudCanvas.getContext('2d');
   const img = ctx.createImageData(width, height);
   const data = img.data;
 
@@ -995,10 +1123,13 @@ function createCloudTexture() {
 
       n = clamp(n, 0, 1);
 
-      const band = Math.sin(v * 120.0 + fbm2D(u * 8.0, v * 40.0) * 2.0) * 0.5 + 0.5;
+      const band =
+        Math.sin(v * 120.0 + fbm2D(u * 8.0, v * 40.0) * 2.0) * 0.5 + 0.5;
+
       const alpha = clamp((n * band - 0.42) * 2.2, 0, 1) * 0.55;
 
       const i = (y * width + x) * 4;
+
       data[i] = 245;
       data[i + 1] = 242;
       data[i + 2] = 236;
@@ -1024,10 +1155,14 @@ function buildRingMesh() {
     ringMesh.geometry.dispose();
   }
 
+  if (params.ringOuterRadius <= params.ringInnerRadius + 0.1) {
+    params.ringOuterRadius = params.ringInnerRadius + 0.1;
+  }
+
   const geometry = new THREE.RingGeometry(
     params.ringInnerRadius,
     params.ringOuterRadius,
-    320,
+    520,
     1
   );
 
@@ -1042,15 +1177,16 @@ function buildRingMesh() {
     side: THREE.DoubleSide,
     depthWrite: true,
     opacity: params.ringOpacity,
-    alphaTest: 0.03,
+    alphaTest: 0.025,
     color: new THREE.Color().setScalar(params.ringBrightness),
     shininess: 18
   });
 
   ringMesh = new THREE.Mesh(geometry, material);
-  ringGroup.add(ringMesh);
 
+  ringGroup.add(ringMesh);
   ringGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+
   updatePlanetShaderUniforms();
 }
 
@@ -1063,6 +1199,7 @@ function remapRingUVs(geometry, innerRadius, outerRadius) {
     const y = pos.getY(i);
 
     const radius = Math.sqrt(x * x + y * y);
+
     let angle = Math.atan2(y, x);
     if (angle < 0) angle += Math.PI * 2;
 
@@ -1117,7 +1254,10 @@ function createRingTexture() {
       density += (fbm2D(u * 140.0, theta * 2.8) - 0.5) * 0.08 * params.ringRadialChaos;
 
       const gapNoise = fbm2D(u * 210.0, theta * 4.0);
-      if (gapNoise > 0.84) density *= 0.62;
+
+      if (gapNoise > 0.84) {
+        density *= 0.62;
+      }
 
       density = clamp(density, 0, 1);
 
@@ -1129,6 +1269,7 @@ function createRingTexture() {
       const a = density;
 
       const i = (y * width + x) * 4;
+
       data[i] = clamp(r, 0, 255);
       data[i + 1] = clamp(g, 0, 255);
       data[i + 2] = clamp(b, 0, 255);
@@ -1141,6 +1282,7 @@ function createRingTexture() {
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
+
   const tempCtx = tempCanvas.getContext('2d');
   tempCtx.drawImage(ringCanvas, 0, 0);
 
@@ -1164,6 +1306,7 @@ function ringDensityProfile(u) {
   if (u < 0.015 || u > 0.995) return 0;
 
   let d = 0;
+
   d += gaussian(u, 0.12, 0.035, 0.08);
   d += gaussian(u, 0.19, 0.060, 0.16);
   d += gaussian(u, 0.29, 0.055, 0.24);
@@ -1194,6 +1337,7 @@ function createStars() {
     scene.remove(starField);
     starField.geometry.dispose();
     starField.material.dispose();
+    starField = null;
   }
 
   if (!params.showStars || params.starCount <= 0) return;
@@ -1215,6 +1359,7 @@ function createStars() {
     positions[i * 3 + 2] = z;
 
     const base = randomRange(0.65, 1.0);
+
     colors[i * 3] = base;
     colors[i * 3 + 1] = base * randomRange(0.96, 1.0);
     colors[i * 3 + 2] = base * randomRange(0.90, 1.0);
@@ -1287,6 +1432,11 @@ function captureByCurrentMode() {
     return;
   }
 
+  if (params.sceneProfile === 'Wallpaper Isomium') {
+    capturePreset('square4096');
+    return;
+  }
+
   capturePreset('4k');
 }
 
@@ -1318,21 +1468,25 @@ function capturePreset(type) {
 function captureFree() {
   const width = Math.max(320, Math.floor(params.freeWidth));
   const height = Math.max(320, Math.floor(params.freeHeight));
+
   captureImage(width, height, `Isomium_Saturn_${width}x${height}.png`);
 }
 
 async function captureImage(width, height, fileName) {
   showCaptureStatus(`Renderizando ${width} × ${height}...`);
-
   triggerFlash();
+
+  await nextFrame();
 
   const oldPixelRatio = renderer.getPixelRatio();
   const oldSize = renderer.getSize(new THREE.Vector2());
   const oldAspect = camera.aspect;
-  const wasPhoneVisible = phonePreviewEl.classList.contains('active');
+  const oldCanvasFilter = canvas.style.filter;
+
+  const wasPhoneVisible = phonePreviewEl?.classList.contains('active') || false;
   const uiWasHidden = document.body.classList.contains('ui-hidden');
 
-  phonePreviewEl.classList.remove('active');
+  phonePreviewEl?.classList.remove('active');
   document.body.classList.add('ui-hidden');
 
   renderer.setPixelRatio(1);
@@ -1341,9 +1495,13 @@ async function captureImage(width, height, fileName) {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
 
+  canvas.style.filter = 'none';
+
   renderer.render(scene, camera);
 
-  const dataURL = renderer.domElement.toDataURL('image/png', 1.0);
+  const processedCanvas = applyCameraPostProcess(renderer.domElement, width, height);
+  const dataURL = processedCanvas.toDataURL('image/png', 1.0);
+
   downloadDataURL(dataURL, fileName);
 
   renderer.setPixelRatio(oldPixelRatio);
@@ -1352,30 +1510,107 @@ async function captureImage(width, height, fileName) {
   camera.aspect = oldAspect;
   camera.updateProjectionMatrix();
 
+  canvas.style.filter = oldCanvasFilter;
+
   if (!uiWasHidden) {
     document.body.classList.remove('ui-hidden');
   }
 
   if (wasPhoneVisible) {
-    phonePreviewEl.classList.add('active');
+    phonePreviewEl?.classList.add('active');
   }
 
   hideCaptureStatus();
 }
 
+function applyCameraPostProcess(sourceCanvas, width, height) {
+  const output = document.createElement('canvas');
+  output.width = width;
+  output.height = height;
+
+  const ctx = output.getContext('2d');
+  ctx.drawImage(sourceCanvas, 0, 0, width, height);
+
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  const cx = width * 0.5;
+  const cy = height * 0.5;
+  const maxDist = Math.sqrt(cx * cx + cy * cy);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+
+      if (params.cameraMono) {
+        const gray = r * 0.299 + g * 0.587 + b * 0.114;
+        r = gray;
+        g = gray;
+        b = gray;
+      }
+
+      if (params.sensorNoise > 0) {
+        const grain = (Math.random() - 0.5) * 255 * params.sensorNoise;
+        r += grain;
+        g += grain;
+        b += grain;
+      }
+
+      if (params.vignette > 0) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) / maxDist;
+        const vignette = 1.0 - Math.pow(dist, 1.7) * params.vignette;
+
+        r *= vignette;
+        g *= vignette;
+        b *= vignette;
+      }
+
+      data[i] = clamp(r, 0, 255);
+      data[i + 1] = clamp(g, 0, 255);
+      data[i + 2] = clamp(b, 0, 255);
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  if (params.bloomMin > 0) {
+    ctx.save();
+    ctx.globalAlpha = params.bloomMin;
+    ctx.filter = 'blur(2px)';
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(output, 0, 0);
+    ctx.restore();
+  }
+
+  return output;
+}
+
 function triggerFlash() {
+  if (!flashEl) return;
+
   flashEl.style.opacity = '1';
+
   setTimeout(() => {
     flashEl.style.opacity = '0';
   }, 90);
 }
 
 function showCaptureStatus(text) {
+  if (!captureStatusEl) return;
+
   captureStatusEl.textContent = text;
   captureStatusEl.style.display = 'block';
 }
 
 function hideCaptureStatus() {
+  if (!captureStatusEl) return;
+
   setTimeout(() => {
     captureStatusEl.style.display = 'none';
   }, 350);
@@ -1383,8 +1618,10 @@ function hideCaptureStatus() {
 
 function downloadDataURL(dataURL, fileName) {
   const link = document.createElement('a');
+
   link.href = dataURL;
   link.download = fileName;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1395,6 +1632,7 @@ function onWindowResize() {
   const h = window.innerHeight;
 
   renderer.setSize(w, h);
+
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -1415,7 +1653,12 @@ function disposeMaterial(material) {
 
   if (material.map) material.map.dispose();
   if (material.alphaMap) material.alphaMap.dispose();
+
   material.dispose();
+}
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
 /* ---------------------- Helpers matemáticos ---------------------- */
