@@ -1,68 +1,251 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import GUI from 'lil-gui';
 
 const canvas = document.getElementById('space-canvas');
-const hud = document.getElementById('hud');
 const captureStatus = document.getElementById('capture-status');
+const flash = document.getElementById('flash');
+
+/*
+  ESCALA REAL NORMALIZADA
+
+  NASA:
+  - Diâmetro equatorial de Saturno: aprox. 120.500 km.
+  - Raio equatorial aproximado: 60.250 km.
+  - Sistema de anéis: até cerca de 282.000 km a partir do planeta.
+
+  Neste render:
+  - Raio de Saturno = 1.65 unidade Three.js.
+  - Raio externo do sistema de anéis = raio de Saturno + proporção real dos anéis.
+*/
+
+const SATURN_DIAMETER_KM = 120500;
+const SATURN_RADIUS_KM = SATURN_DIAMETER_KM / 2;
+const NASA_RING_EXTENSION_FROM_PLANET_KM = 282000;
+const RING_OUTER_RATIO_FROM_CENTER =
+  (SATURN_RADIUS_KM + NASA_RING_EXTENSION_FROM_PLANET_KM) / SATURN_RADIUS_KM;
+
+const PLANET_RADIUS = 1.65;
+const TRUE_RING_OUTER_RADIUS = PLANET_RADIUS * RING_OUTER_RATIO_FROM_CENTER;
+
+/*
+  Perfis proporcionais dos anéis principais.
+  Os valores são aproximados em relação ao raio equatorial de Saturno.
+  A ideia aqui é obter uma aparência proporcional, legível e fiel o bastante
+  para arte/render, sem sacrificar composição.
+*/
+
+const ringBands = [
+  {
+    name: 'D',
+    innerRatio: 1.11,
+    outerRatio: 1.24,
+    opacity: 0.10,
+    brightness: 0.35
+  },
+  {
+    name: 'C',
+    innerRatio: 1.24,
+    outerRatio: 1.53,
+    opacity: 0.32,
+    brightness: 0.62
+  },
+  {
+    name: 'B',
+    innerRatio: 1.53,
+    outerRatio: 1.95,
+    opacity: 0.78,
+    brightness: 1.15
+  },
+  {
+    name: 'Cassini Division',
+    innerRatio: 1.95,
+    outerRatio: 2.03,
+    opacity: 0.02,
+    brightness: 0.02
+  },
+  {
+    name: 'A',
+    innerRatio: 2.03,
+    outerRatio: 2.27,
+    opacity: 0.58,
+    brightness: 0.94
+  },
+  {
+    name: 'F',
+    innerRatio: 2.32,
+    outerRatio: 2.36,
+    opacity: 0.34,
+    brightness: 1.20
+  },
+  {
+    name: 'G',
+    innerRatio: 2.75,
+    outerRatio: 2.90,
+    opacity: 0.10,
+    brightness: 0.42
+  },
+  {
+    name: 'E',
+    innerRatio: 2.98,
+    outerRatio: RING_OUTER_RATIO_FROM_CENTER,
+    opacity: 0.045,
+    brightness: 0.28
+  }
+];
 
 const params = {
   // Cena
-  autoRotate: true,
-  autoRotateSpeed: 0.1,
-  
-  // Câmera
-  cameraFov: 35,
-  cameraDistance: 6.5,
+  autoRotate: false,
+  autoRotateSpeed: 0.08,
+  showUI: true,
 
-  // Saturno (Dados NASA)
-  planetRotation: 26.73, // Inclinação axial real
-  planetScale: 1.0,      // Raio base estabilizado
-  planetBrightness: 1.0,
-  planetContrast: 1.3,
-  surfaceSpeed: 0.02,
-  
-  // Filtro Estético
-  monochrome: true,      // "Comer tudo" em P&B
+  // Composição para print
+  cinematicOffsetX: -1.55,
+  cinematicOffsetY: 0.10,
+  cameraFov: 31,
+  cameraDistance: 12.4,
 
-  // Anéis (Proporção NASA: 1.12 a 2.37 do raio)
-  ringTilt: 26.73,       // Alinhado com o planeta
-  ringOpacity: 0.9,
-  ringBrightness: 1.2,
-  ringInnerRadius: 1.12,
-  ringOuterRadius: 2.37,
+  // Saturno
+  planetRotation: -13,
+  planetScale: 1,
+  planetBrightness: 0.72,
+  planetContrast: 1.34,
+  surfaceSpeed: 0.0,
+  monochromeTexture: true,
 
-  // Luz Estelar (Sol)
-  lightX: -8.0,
-  lightY: 2.5,
-  lightZ: 5.0,
-  lightIntensity: 3.5,
-  ambientIntensity: 0.05, // Quase zero para realismo no espaço escuro
+  // Anéis
+  ringTilt: 74,
+  ringGlobalOpacity: 0.92,
+  ringGlobalBrightness: 1.05,
+  useTrueRingScale: true,
+  showFaintOuterRings: true,
 
-  // Fundo (Via Láctea realista)
-  starAmount: 8000,
-  starBrightness: 0.8,
-  starMotion: 0.005,
+  // Luz
+  lightX: -6.5,
+  lightY: 3.6,
+  lightZ: 7.5,
+  lightIntensity: 3.8,
+  ambientIntensity: 0.10,
 
-  // Render Engine
-  exposure: 1.1,
+  // Estrelas
+  starAmount: 1900,
+  starBrightness: 0.48,
+  starSize: 0.055,
+  starMotion: 0.0,
+
+  // Render base
+  rendererExposure: 1.04,
+
+  // Modo Foto / Pós-processamento
+  postExposure: 1.04,
+  postSaturation: 0.0,
+  postContrast: 1.34,
+  postVignette: 0.44,
+  postGrain: 0.018,
+  monochromeFinal: true
 };
 
-let scene, camera, renderer, controls, clock;
-let saturnGroup, planetMesh, ringMesh, stars, starMaterial, sunLight, ambientLight;
+let scene;
+let camera;
+let renderer;
+let composer;
+let renderPass;
+let photoPass;
+let controls;
+let clock;
+
+let saturnGroup;
+let planetMesh;
+let ringsGroup;
+let stars;
+let starMaterial;
+let sunLight;
+let ambientLight;
 let gui;
+
+const PhotoShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uExposure: { value: params.postExposure },
+    uSaturation: { value: params.postSaturation },
+    uContrast: { value: params.postContrast },
+    uVignette: { value: params.postVignette },
+    uGrain: { value: params.postGrain },
+    uMonochrome: { value: params.monochromeFinal ? 1.0 : 0.0 },
+    uTime: { value: 0 }
+  },
+
+  vertexShader: `
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uExposure;
+    uniform float uSaturation;
+    uniform float uContrast;
+    uniform float uVignette;
+    uniform float uGrain;
+    uniform float uMonochrome;
+    uniform float uTime;
+
+    varying vec2 vUv;
+
+    float random(vec2 st) {
+      return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+    }
+
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+
+      color.rgb *= uExposure;
+
+      float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+
+      if (uMonochrome > 0.5) {
+        color.rgb = vec3(gray);
+      } else {
+        color.rgb = mix(vec3(gray), color.rgb, uSaturation);
+      }
+
+      color.rgb = (color.rgb - 0.5) * uContrast + 0.5;
+
+      float dist = distance(vUv, vec2(0.5));
+      float vignette = smoothstep(0.86, 0.22, dist);
+      color.rgb *= mix(1.0, vignette, uVignette);
+
+      float grain = random(vUv * 2200.0 + uTime * 0.11);
+      color.rgb += (grain - 0.5) * uGrain;
+
+      color.rgb = clamp(color.rgb, 0.0, 1.0);
+
+      gl_FragColor = color;
+    }
+  `
+};
 
 init();
 animate();
 
 function init() {
   clock = new THREE.Clock();
+
   createRenderer();
   createScene();
   createCamera();
   createLights();
   createSaturn();
   createStars();
+  createComposer();
   createControls();
   createGui();
   bindButtons();
@@ -79,12 +262,12 @@ function createRenderer() {
     alpha: false,
     preserveDrawingBuffer: true
   });
+
   renderer.setClearColor(0x000000, 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  // Tone mapping ACESFilmic garante que os brancos não estourem feio
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = params.exposure;
+  renderer.toneMappingExposure = params.rendererExposure;
 }
 
 function createScene() {
@@ -93,16 +276,20 @@ function createScene() {
 }
 
 function createCamera() {
-  camera = new THREE.PerspectiveCamera(params.cameraFov, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.set(0, 0, params.cameraDistance);
+  camera = new THREE.PerspectiveCamera(
+    params.cameraFov,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    5000
+  );
+
+  camera.position.set(params.cinematicOffsetX, 0.72 + params.cinematicOffsetY, params.cameraDistance);
 }
 
 function createLights() {
-  // Luz ambiente fria e fraca
   ambientLight = new THREE.AmbientLight(0xffffff, params.ambientIntensity);
   scene.add(ambientLight);
 
-  // Luz do sol direta e dura
   sunLight = new THREE.DirectionalLight(0xffffff, params.lightIntensity);
   sunLight.position.set(params.lightX, params.lightY, params.lightZ);
   scene.add(sunLight);
@@ -110,37 +297,88 @@ function createLights() {
 
 function createSaturn() {
   saturnGroup = new THREE.Group();
+  saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.planetRotation);
   scene.add(saturnGroup);
 
-  // O planeta
-  const planetGeometry = new THREE.SphereGeometry(1.0, 128, 128); // Mesh densa para silhueta perfeita
+  const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 192, 96);
+
   const planetMaterial = new THREE.MeshStandardMaterial({
     map: createSaturnTexture(),
-    roughness: 0.9,
-    metalness: 0.0,
+    roughness: 0.92,
+    metalness: 0,
+    color: new THREE.Color(
+      params.planetBrightness,
+      params.planetBrightness,
+      params.planetBrightness
+    )
   });
 
   planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
-  planetMesh.rotation.z = THREE.MathUtils.degToRad(params.planetRotation);
+  planetMesh.scale.setScalar(params.planetScale);
   saturnGroup.add(planetMesh);
 
-  // Os anéis
-  const ringGeometry = new THREE.RingGeometry(params.ringInnerRadius, params.ringOuterRadius, 512, 32);
-  fixRingUV(ringGeometry, params.ringInnerRadius, params.ringOuterRadius);
+  ringsGroup = new THREE.Group();
+  ringsGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+  saturnGroup.add(ringsGroup);
 
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    map: createRingTexture(),
-    transparent: true,
-    opacity: params.ringOpacity,
-    side: THREE.DoubleSide,
-    depthWrite: false,
+  createPhysicalRingSystem();
+}
+
+function createPhysicalRingSystem() {
+  clearRings();
+
+  ringBands.forEach((band) => {
+    if (!params.showFaintOuterRings && ['G', 'E'].includes(band.name)) {
+      return;
+    }
+
+    const innerRadius = PLANET_RADIUS * band.innerRatio;
+    const outerRadius = params.useTrueRingScale
+      ? PLANET_RADIUS * band.outerRatio
+      : PLANET_RADIUS * Math.min(band.outerRatio, 2.65);
+
+    const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 512, 4);
+    fixRingUV(geometry, innerRadius, outerRadius);
+
+    const opacity =
+      band.opacity *
+      params.ringGlobalOpacity *
+      (band.name === 'E' ? 0.42 : 1);
+
+    const brightness =
+      band.brightness *
+      params.ringGlobalBrightness;
+
+    const material = new THREE.MeshBasicMaterial({
+      map: createRingBandTexture(band),
+      transparent: true,
+      opacity,
+      side: THREE.DoubleSide,
+      depthTest: true,
+      depthWrite: false,
+      color: new THREE.Color(brightness, brightness, brightness)
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `Ring_${band.name}`;
+
+    ringsGroup.add(mesh);
   });
+}
 
-  ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
-  ringMesh.rotation.x = THREE.MathUtils.degToRad(90 - params.ringTilt); // Alinha com o equador do planeta
-  saturnGroup.add(ringMesh);
-  
-  applyMonochromeState();
+function clearRings() {
+  if (!ringsGroup) return;
+
+  while (ringsGroup.children.length > 0) {
+    const child = ringsGroup.children.pop();
+
+    if (child.geometry) child.geometry.dispose();
+
+    if (child.material) {
+      if (child.material.map) child.material.map.dispose();
+      child.material.dispose();
+    }
+  }
 }
 
 function createStars() {
@@ -148,16 +386,10 @@ function createStars() {
   const positions = [];
   const colors = [];
 
-  // Criação de um cinturão da Via Láctea + estrelas dispersas
   for (let i = 0; i < params.starAmount; i++) {
-    const radius = THREE.MathUtils.randFloat(50, 200);
-    
-    // Viés para o equador galáctico (banda da Via Láctea)
-    let phi = Math.acos(THREE.MathUtils.randFloatSpread(2));
-    if (Math.random() > 0.4) {
-      phi = Math.PI / 2 + THREE.MathUtils.randFloatSpread(0.5); // Concentra no meio
-    }
+    const radius = THREE.MathUtils.randFloat(65, 220);
     const theta = THREE.MathUtils.randFloat(0, Math.PI * 2);
+    const phi = Math.acos(THREE.MathUtils.randFloatSpread(2));
 
     const x = radius * Math.sin(phi) * Math.cos(theta);
     const y = radius * Math.sin(phi) * Math.sin(theta);
@@ -165,8 +397,7 @@ function createStars() {
 
     positions.push(x, y, z);
 
-    // No modo monocromático absoluto, estrelas são puramente cinzas/brancas
-    const intensity = THREE.MathUtils.randFloat(0.2, 1.0);
+    const intensity = THREE.MathUtils.randFloat(0.28, 0.82);
     colors.push(intensity, intensity, intensity);
   }
 
@@ -174,7 +405,7 @@ function createStars() {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
   starMaterial = new THREE.PointsMaterial({
-    size: 0.05,
+    size: params.starSize,
     vertexColors: true,
     transparent: true,
     opacity: params.starBrightness,
@@ -186,247 +417,567 @@ function createStars() {
   scene.add(stars);
 }
 
-// ==========================================
-// GERADORES PROCEDURAIS DE TEXTURA
-// ==========================================
+function createComposer() {
+  composer = new EffectComposer(renderer);
+
+  renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+
+  photoPass = new ShaderPass(PhotoShader);
+  composer.addPass(photoPass);
+
+  updatePostFX();
+}
+
+function createControls() {
+  controls = new OrbitControls(camera, renderer.domElement);
+
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.045;
+
+  controls.autoRotate = params.autoRotate;
+  controls.autoRotateSpeed = params.autoRotateSpeed;
+
+  controls.minDistance = 3.2;
+  controls.maxDistance = 42;
+  controls.enablePan = true;
+
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function createGui() {
+  gui = new GUI({
+    title: 'ISOMIUM PHOTO MODE',
+    width: 340
+  });
+
+  const folderPrint = gui.addFolder('Print / Composição');
+  folderPrint.add(params, 'cameraFov', 12, 75, 1).name('FOV').onChange(updateLive);
+  folderPrint.add(params, 'cameraDistance', 4, 36, 0.1).name('Distância').onChange(updateCameraPosition);
+  folderPrint.add(params, 'cinematicOffsetX', -8, 8, 0.01).name('Offset X').onChange(updateCameraPosition);
+  folderPrint.add(params, 'cinematicOffsetY', -5, 5, 0.01).name('Offset Y').onChange(updateCameraPosition);
+
+  const folderScene = gui.addFolder('Cena');
+  folderScene.add(params, 'autoRotate').name('Auto rotação').onChange(updateLive);
+  folderScene.add(params, 'autoRotateSpeed', -2, 2, 0.01).name('Velocidade').onChange(updateLive);
+  folderScene.add(params, 'rendererExposure', 0.3, 2.5, 0.01).name('Exposição base').onChange(updateLive);
+  folderScene.add(params, 'showUI').name('Mostrar UI').onChange(setUIVisibility);
+
+  const folderPlanet = gui.addFolder('Saturno realista');
+  folderPlanet.add(params, 'planetRotation', -180, 180, 1).name('Inclinação').onChange(updateLive);
+  folderPlanet.add(params, 'planetScale', 0.6, 1.8, 0.01).name('Escala').onChange(updateLive);
+  folderPlanet.add(params, 'planetBrightness', 0.1, 2, 0.01).name('Brilho').onChange(updateLive);
+  folderPlanet.add(params, 'planetContrast', 0.5, 2.8, 0.01).name('Contraste textura').onChange(rebuildPlanetTexture);
+  folderPlanet.add(params, 'surfaceSpeed', -0.2, 0.2, 0.001).name('Rotação textura');
+  folderPlanet.add(params, 'monochromeTexture').name('Textura P&B').onChange(rebuildPlanetTexture);
+
+  const folderRing = gui.addFolder('Anéis em escala');
+  folderRing.add(params, 'ringTilt', 0, 90, 1).name('Inclinação').onChange(updateLive);
+  folderRing.add(params, 'ringGlobalOpacity', 0, 1.6, 0.01).name('Opacidade').onChange(updateRingMaterials);
+  folderRing.add(params, 'ringGlobalBrightness', 0.1, 2.6, 0.01).name('Brilho').onChange(updateRingMaterials);
+  folderRing.add(params, 'useTrueRingScale').name('Escala real').onChange(createPhysicalRingSystem);
+  folderRing.add(params, 'showFaintOuterRings').name('Mostrar G/E').onChange(createPhysicalRingSystem);
+
+  const folderLight = gui.addFolder('Luz');
+  folderLight.add(params, 'lightX', -18, 18, 0.1).name('Luz X').onChange(updateLive);
+  folderLight.add(params, 'lightY', -18, 18, 0.1).name('Luz Y').onChange(updateLive);
+  folderLight.add(params, 'lightZ', -18, 18, 0.1).name('Luz Z').onChange(updateLive);
+  folderLight.add(params, 'lightIntensity', 0, 10, 0.1).name('Intensidade').onChange(updateLive);
+  folderLight.add(params, 'ambientIntensity', 0, 1.5, 0.01).name('Ambiente').onChange(updateLive);
+
+  const folderStars = gui.addFolder('Fundo espacial');
+  folderStars.add(params, 'starBrightness', 0, 1.5, 0.01).name('Brilho estrelas').onChange(updateLive);
+  folderStars.add(params, 'starSize', 0.01, 0.18, 0.001).name('Tamanho estrelas').onChange(updateLive);
+  folderStars.add(params, 'starMotion', -0.08, 0.08, 0.001).name('Movimento');
+
+  const folderPhoto = gui.addFolder('Filtro preto e branco');
+  folderPhoto.add(params, 'monochromeFinal').name('P&B total').onChange(updatePostFX);
+  folderPhoto.add(params, 'postExposure', 0.4, 2.5, 0.01).name('Exposição').onChange(updatePostFX);
+  folderPhoto.add(params, 'postSaturation', 0, 2, 0.01).name('Saturação').onChange(updatePostFX);
+  folderPhoto.add(params, 'postContrast', 0.4, 2.8, 0.01).name('Contraste').onChange(updatePostFX);
+  folderPhoto.add(params, 'postVignette', 0, 1, 0.01).name('Vinheta').onChange(updatePostFX);
+  folderPhoto.add(params, 'postGrain', 0, 0.12, 0.001).name('Grão').onChange(updatePostFX);
+
+  const actions = {
+    export4K: () => exportPNG(3840, 2160, 'Isomium_Saturn_4K.png'),
+    exportVertical: () => exportPNG(2160, 3840, 'Isomium_Saturn_4K_Vertical.png'),
+    exportSquare: () => exportPNG(4096, 4096, 'Isomium_Saturn_4096x4096.png'),
+    reset: resetView
+  };
+
+  folderPhoto.add(actions, 'export4K').name('Capturar 3840x2160');
+  folderPhoto.add(actions, 'exportVertical').name('Capturar 2160x3840');
+  folderPhoto.add(actions, 'exportSquare').name('Capturar 4096x4096');
+  folderPhoto.add(actions, 'reset').name('Resetar cena');
+
+  folderPrint.open();
+  folderRing.open();
+  folderPhoto.open();
+}
 
 function createSaturnTexture() {
-  const width = 2048;
-  const height = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const width = 4096;
+  const height = 2048;
 
-  // Gradiente base mais realista (tons de amônia e metano)
+  const textureCanvas = document.createElement('canvas');
+  textureCanvas.width = width;
+  textureCanvas.height = height;
+
+  const ctx = textureCanvas.getContext('2d');
+
   const baseGradient = ctx.createLinearGradient(0, 0, 0, height);
-  if (params.monochrome) {
-    baseGradient.addColorStop(0.00, '#333333');
-    baseGradient.addColorStop(0.15, '#777777');
-    baseGradient.addColorStop(0.35, '#555555');
-    baseGradient.addColorStop(0.50, '#999999');
-    baseGradient.addColorStop(0.65, '#666666');
-    baseGradient.addColorStop(0.85, '#888888');
-    baseGradient.addColorStop(1.00, '#222222');
-  } else {
-    baseGradient.addColorStop(0.00, '#8c7e6d');
-    baseGradient.addColorStop(0.15, '#d3c1a5');
-    baseGradient.addColorStop(0.35, '#c5b08e');
-    baseGradient.addColorStop(0.50, '#e8d8b7');
-    baseGradient.addColorStop(0.65, '#c1aa82');
-    baseGradient.addColorStop(0.85, '#d1c0a8');
-    baseGradient.addColorStop(1.00, '#6b6154');
-  }
+
+  baseGradient.addColorStop(0.00, '#9f9788');
+  baseGradient.addColorStop(0.10, '#beb6a5');
+  baseGradient.addColorStop(0.22, '#d4c7ae');
+  baseGradient.addColorStop(0.34, '#a99f90');
+  baseGradient.addColorStop(0.48, '#c7b8a0');
+  baseGradient.addColorStop(0.58, '#9a9184');
+  baseGradient.addColorStop(0.68, '#d9cbb0');
+  baseGradient.addColorStop(0.78, '#b7aa99');
+  baseGradient.addColorStop(0.90, '#817a70');
+  baseGradient.addColorStop(1.00, '#5f5b55');
 
   ctx.fillStyle = baseGradient;
   ctx.fillRect(0, 0, width, height);
 
-  // Faixas atmosféricas (ventos supersônicos)
   for (let y = 0; y < height; y += 4) {
-    const alpha = 0.02 + Math.random() * 0.05;
-    const bandHeight = 1 + Math.random() * 8;
-    ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+    const alpha = 0.02 + Math.random() * 0.085;
+    const bandHeight = 1 + Math.random() * 10;
+
+    ctx.fillStyle = Math.random() > 0.52
+      ? `rgba(255,255,255,${alpha})`
+      : `rgba(0,0,0,${alpha})`;
+
     ctx.fillRect(0, y, width, bandHeight);
   }
 
-  // Ruído para dar textura de gás
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const data = imgData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 15;
-    data[i] = Math.min(255, Math.max(0, data[i] + noise));
-    data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
-    data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise));
+  for (let i = 0; i < 26000; i++) {
+    const x = Math.random() * width;
+    const y = Math.random() * height;
+    const alpha = Math.random() * 0.04;
 
-    // Aplica o contraste extra pedido para o visual fotográfico
-    if (params.monochrome) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const contrasted = ((gray / 255 - 0.5) * params.planetContrast + 0.5) * 255;
-      data[i] = data[i+1] = data[i+2] = contrasted;
-    }
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(x, y, 1, 1);
   }
-  ctx.putImageData(imgData, 0, 0);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  if (params.monochromeTexture) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const gray =
+        data[i] * 0.299 +
+        data[i + 1] * 0.587 +
+        data[i + 2] * 0.114;
+
+      const contrasted =
+        ((gray / 255 - 0.5) * params.planetContrast + 0.5) * 255;
+
+      data[i] = contrasted;
+      data[i + 1] = contrasted;
+      data[i + 2] = contrasted;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  const texture = new THREE.CanvasTexture(textureCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.anisotropy = 16;
+
   return texture;
 }
 
-function createRingTexture() {
+function createRingBandTexture(band) {
   const width = 2048;
-  const height = 128; // 1D map stretched
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  
+  const height = 128;
+
+  const textureCanvas = document.createElement('canvas');
+  textureCanvas.width = width;
+  textureCanvas.height = height;
+
+  const ctx = textureCanvas.getContext('2d');
   ctx.clearRect(0, 0, width, height);
 
-  // Posições baseadas nos anéis C, B, A, Divisão de Cassini, etc.
   const gradient = ctx.createLinearGradient(0, 0, width, 0);
-  
-  // Cores adaptáveis ao modo P&B
-  const cGap = 'rgba(0,0,0,0)';
-  const cFaint = params.monochrome ? 'rgba(255,255,255,0.1)' : 'rgba(210,190,170,0.1)';
-  const cMed = params.monochrome ? 'rgba(255,255,255,0.5)' : 'rgba(210,190,170,0.5)';
-  const cDense = params.monochrome ? 'rgba(255,255,255,0.9)' : 'rgba(220,200,180,0.9)';
 
-  gradient.addColorStop(0.00, cGap);
-  gradient.addColorStop(0.05, cFaint); // Anel C (translúcido)
-  gradient.addColorStop(0.20, cMed);
-  gradient.addColorStop(0.25, cGap);   // Divisão
-  gradient.addColorStop(0.26, cDense); // Anel B (denso e brilhante)
-  gradient.addColorStop(0.50, cDense);
-  gradient.addColorStop(0.65, cMed);
-  gradient.addColorStop(0.72, cGap);   // Divisão de Cassini
-  gradient.addColorStop(0.76, cGap);
-  gradient.addColorStop(0.77, cMed);   // Anel A
-  gradient.addColorStop(0.90, cFaint);
-  gradient.addColorStop(0.95, cGap);   // Divisão de Encke
-  gradient.addColorStop(0.98, cFaint);
-  gradient.addColorStop(1.00, cGap);
+  if (band.name === 'Cassini Division') {
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  } else {
+    gradient.addColorStop(0.00, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0.08, 'rgba(255,255,255,0.20)');
+    gradient.addColorStop(0.18, 'rgba(255,255,255,0.70)');
+    gradient.addColorStop(0.34, 'rgba(255,255,255,0.36)');
+    gradient.addColorStop(0.48, 'rgba(255,255,255,0.88)');
+    gradient.addColorStop(0.62, 'rgba(255,255,255,0.40)');
+    gradient.addColorStop(0.82, 'rgba(255,255,255,0.22)');
+    gradient.addColorStop(1.00, 'rgba(255,255,255,0)');
+  }
 
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  // Ranhuras procedurais finas (densidade das partículas)
   for (let x = 0; x < width; x += 2) {
-    if (Math.random() > 0.6) {
-      const alpha = Math.random() * 0.15;
-      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
-      ctx.fillRect(x, 0, 1 + Math.random() * 2, height);
-    }
+    const alpha = Math.random() * 0.11;
+    const lineWidth = 1 + Math.random() * 2;
+
+    ctx.fillStyle = Math.random() > 0.5
+      ? `rgba(255,255,255,${alpha * 0.55})`
+      : `rgba(0,0,0,${alpha})`;
+
+    ctx.fillRect(x, 0, lineWidth, height);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(textureCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.anisotropy = 16;
+
   return texture;
 }
 
 function fixRingUV(geometry, innerRadius, outerRadius) {
-  const pos = geometry.attributes.position;
+  const position = geometry.attributes.position;
   const uv = geometry.attributes.uv;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const radius = Math.sqrt(v.x * v.x + v.y * v.y);
-    uv.setXY(i, (radius - innerRadius) / (outerRadius - innerRadius), 0.5);
+
+  const vector = new THREE.Vector3();
+
+  for (let i = 0; i < position.count; i++) {
+    vector.fromBufferAttribute(position, i);
+
+    const radius = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+    const normalizedRadius = (radius - innerRadius) / (outerRadius - innerRadius);
+
+    uv.setXY(i, normalizedRadius, 0.5);
   }
+
   uv.needsUpdate = true;
 }
 
-// ==========================================
-// CONTROLES E ATUALIZAÇÃO
-// ==========================================
+function updateCameraPosition() {
+  camera.position.set(
+    params.cinematicOffsetX,
+    0.72 + params.cinematicOffsetY,
+    params.cameraDistance
+  );
 
-function createControls() {
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function updateLive() {
+  renderer.toneMappingExposure = params.rendererExposure;
+
+  camera.fov = params.cameraFov;
+  camera.updateProjectionMatrix();
+
   controls.autoRotate = params.autoRotate;
   controls.autoRotateSpeed = params.autoRotateSpeed;
-  controls.minDistance = 2.0;
-  controls.maxDistance = 25.0;
+
+  saturnGroup.rotation.z = THREE.MathUtils.degToRad(params.planetRotation);
+
+  planetMesh.scale.setScalar(params.planetScale);
+
+  planetMesh.material.color.setRGB(
+    params.planetBrightness,
+    params.planetBrightness,
+    params.planetBrightness
+  );
+
+  ringsGroup.rotation.x = THREE.MathUtils.degToRad(params.ringTilt);
+
+  sunLight.position.set(params.lightX, params.lightY, params.lightZ);
+  sunLight.intensity = params.lightIntensity;
+
+  ambientLight.intensity = params.ambientIntensity;
+
+  starMaterial.opacity = params.starBrightness;
+  starMaterial.size = params.starSize;
+
+  updateRingMaterials();
+  updatePostFX();
 }
 
-function applyMonochromeState() {
-  if (params.monochrome) {
-    sunLight.color.setHex(0xffffff);
-    ambientLight.color.setHex(0xffffff);
-    ringMesh.material.color.setRGB(params.ringBrightness, params.ringBrightness, params.ringBrightness);
-    planetMesh.material.color.setRGB(params.planetBrightness, params.planetBrightness, params.planetBrightness);
-  } else {
-    sunLight.color.setHex(0xfff5e6); // Luz solar levemente quente
-    ambientLight.color.setHex(0x223344);
-    ringMesh.material.color.setRGB(params.ringBrightness, params.ringBrightness * 0.95, params.ringBrightness * 0.85);
-    planetMesh.material.color.setRGB(params.planetBrightness, params.planetBrightness * 0.95, params.planetBrightness * 0.9);
-  }
-  
-  // Regera as texturas procedurais para respeitar a paleta
-  if(planetMesh.material.map) planetMesh.material.map.dispose();
-  planetMesh.material.map = createSaturnTexture();
-  
-  if(ringMesh.material.map) ringMesh.material.map.dispose();
-  ringMesh.material.map = createRingTexture();
-}
+function updateRingMaterials() {
+  if (!ringsGroup) return;
 
-function createGui() {
-  gui = new GUI({ title: 'NASA DATA CONTROLS' });
+  ringsGroup.children.forEach((mesh) => {
+    const bandName = mesh.name.replace('Ring_', '');
+    const band = ringBands.find((item) => item.name === bandName);
 
-  gui.add(params, 'monochrome').name('B&W Film Mode').onChange(applyMonochromeState);
-  gui.add(params, 'exposure', 0.5, 3.0, 0.01).name('Exposição da Lente').onChange(v => renderer.toneMappingExposure = v);
-  gui.add(params, 'cameraDistance', 2, 15, 0.1).name('Distância Focal').onChange(v => camera.position.z = v);
-  
-  const folderFisica = gui.addFolder('Física e Escala');
-  folderFisica.add(params, 'planetRotation', -90, 90, 0.1).name('Inclinação Planeta').onChange(v => planetMesh.rotation.z = THREE.MathUtils.degToRad(v));
-  folderFisica.add(params, 'ringTilt', 0, 90, 0.1).name('Inclinação Anéis').onChange(v => ringMesh.rotation.x = THREE.MathUtils.degToRad(90 - v));
-}
+    if (!band) return;
 
-// ... [O restante do código de exportação PNG (bindButtons, exportPNG, saveCanvasAsPNG) permanece idêntico ao seu original, já que ele funciona perfeitamente para gerar as prints 4K] ...
+    const opacity =
+      band.opacity *
+      params.ringGlobalOpacity *
+      (band.name === 'E' ? 0.42 : 1);
 
-function bindButtons() {
-  // Mantendo sua lógica de exportação limpa e precisa
-  document.getElementById('btn-export-4k').addEventListener('click', () => exportPNG(3840, 2160, 'Isomium_Saturn_4K.png'));
-  document.getElementById('btn-export-vertical').addEventListener('click', () => exportPNG(2160, 3840, 'Isomium_Saturn_4K_Vert.png'));
-  document.getElementById('btn-toggle-ui').addEventListener('click', () => document.body.classList.toggle('ui-hidden'));
-}
+    const brightness =
+      band.brightness *
+      params.ringGlobalBrightness;
 
-function bindKeyboard() {
-  window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 'h') document.body.classList.toggle('ui-hidden');
-    if (e.key.toLowerCase() === 'p') exportPNG(3840, 2160, 'Isomium_Saturn_4K.png');
+    mesh.material.opacity = opacity;
+    mesh.material.color.setRGB(brightness, brightness, brightness);
   });
 }
 
+function updatePostFX() {
+  if (!photoPass) return;
+
+  photoPass.uniforms.uExposure.value = params.postExposure;
+  photoPass.uniforms.uSaturation.value = params.postSaturation;
+  photoPass.uniforms.uContrast.value = params.postContrast;
+  photoPass.uniforms.uVignette.value = params.postVignette;
+  photoPass.uniforms.uGrain.value = params.postGrain;
+  photoPass.uniforms.uMonochrome.value = params.monochromeFinal ? 1.0 : 0.0;
+}
+
+function rebuildPlanetTexture() {
+  if (planetMesh.material.map) {
+    planetMesh.material.map.dispose();
+  }
+
+  planetMesh.material.map = createSaturnTexture();
+  planetMesh.material.needsUpdate = true;
+}
+
+function bindButtons() {
+  document.getElementById('btn-export-4k').addEventListener('click', () => {
+    exportPNG(3840, 2160, 'Isomium_Saturn_4K.png');
+  });
+
+  document.getElementById('btn-export-vertical').addEventListener('click', () => {
+    exportPNG(2160, 3840, 'Isomium_Saturn_4K_Vertical.png');
+  });
+
+  document.getElementById('btn-export-square').addEventListener('click', () => {
+    exportPNG(4096, 4096, 'Isomium_Saturn_4096x4096.png');
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', resetView);
+
+  document.getElementById('btn-toggle-ui').addEventListener('click', () => {
+    params.showUI = !params.showUI;
+    setUIVisibility();
+    refreshGui();
+  });
+}
+
+function bindKeyboard() {
+  window.addEventListener('keydown', (event) => {
+    const key = event.key.toLowerCase();
+
+    if (key === 'h') {
+      params.showUI = !params.showUI;
+      setUIVisibility();
+      refreshGui();
+    }
+
+    if (key === 'p') {
+      exportPNG(3840, 2160, 'Isomium_Saturn_4K.png');
+    }
+  });
+}
+
+function setUIVisibility() {
+  document.body.classList.toggle('ui-hidden', !params.showUI);
+}
+
+function resetView() {
+  params.autoRotate = false;
+  params.autoRotateSpeed = 0.08;
+  params.showUI = true;
+
+  params.cinematicOffsetX = -1.55;
+  params.cinematicOffsetY = 0.10;
+  params.cameraFov = 31;
+  params.cameraDistance = 12.4;
+
+  params.planetRotation = -13;
+  params.planetScale = 1;
+  params.planetBrightness = 0.72;
+  params.planetContrast = 1.34;
+  params.surfaceSpeed = 0.0;
+  params.monochromeTexture = true;
+
+  params.ringTilt = 74;
+  params.ringGlobalOpacity = 0.92;
+  params.ringGlobalBrightness = 1.05;
+  params.useTrueRingScale = true;
+  params.showFaintOuterRings = true;
+
+  params.lightX = -6.5;
+  params.lightY = 3.6;
+  params.lightZ = 7.5;
+  params.lightIntensity = 3.8;
+  params.ambientIntensity = 0.10;
+
+  params.starBrightness = 0.48;
+  params.starSize = 0.055;
+  params.starMotion = 0.0;
+
+  params.rendererExposure = 1.04;
+
+  params.postExposure = 1.04;
+  params.postSaturation = 0.0;
+  params.postContrast = 1.34;
+  params.postVignette = 0.44;
+  params.postGrain = 0.018;
+  params.monochromeFinal = true;
+
+  updateCameraPosition();
+  setUIVisibility();
+  rebuildPlanetTexture();
+  createPhysicalRingSystem();
+  updateLive();
+  refreshGui();
+}
+
 async function exportPNG(width, height, filename) {
-  const wasHidden = document.body.classList.contains('ui-hidden');
-  document.body.classList.add('ui-hidden');
+  showCaptureStatus(true);
+  triggerFlash();
+
+  await nextFrame();
+
+  const previousShowUI = params.showUI;
+  const previousAutoRotate = controls.autoRotate;
+
+  params.showUI = false;
+  controls.autoRotate = false;
+  setUIVisibility();
 
   const oldSize = new THREE.Vector2();
   renderer.getSize(oldSize);
+
   const oldPixelRatio = renderer.getPixelRatio();
   const oldAspect = camera.aspect;
 
   try {
     renderer.setPixelRatio(1);
+    composer.setPixelRatio(1);
+
     renderer.setSize(width, height, false);
+    composer.setSize(width, height);
+
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
 
-    const sourceCanvas = renderer.domElement;
+    controls.update();
+
+    renderFrame();
+
+    await saveCanvasAsPNG(renderer.domElement, filename);
+  } finally {
+    renderer.setPixelRatio(oldPixelRatio);
+    composer.setPixelRatio(oldPixelRatio);
+
+    renderer.setSize(oldSize.x, oldSize.y, false);
+    composer.setSize(oldSize.x, oldSize.y);
+
+    camera.aspect = oldAspect;
+    camera.updateProjectionMatrix();
+
+    controls.autoRotate = previousAutoRotate;
+
+    params.showUI = previousShowUI;
+    setUIVisibility();
+
+    refreshGui();
+
+    showCaptureStatus(false);
+  }
+}
+
+function saveCanvasAsPNG(sourceCanvas, filename) {
+  return new Promise((resolve) => {
     sourceCanvas.toBlob((blob) => {
+      if (!blob) {
+        const fallback = document.createElement('a');
+        fallback.download = filename;
+        fallback.href = sourceCanvas.toDataURL('image/png');
+        fallback.click();
+        resolve();
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+
       link.download = filename;
       link.href = url;
       link.click();
+
       URL.revokeObjectURL(url);
+      resolve();
     }, 'image/png', 1);
-  } finally {
-    renderer.setPixelRatio(oldPixelRatio);
-    renderer.setSize(oldSize.x, oldSize.y, false);
-    camera.aspect = oldAspect;
-    camera.updateProjectionMatrix();
-    if (!wasHidden) document.body.classList.remove('ui-hidden');
-  }
+  });
+}
+
+function showCaptureStatus(show) {
+  if (!captureStatus) return;
+
+  captureStatus.style.display = show ? 'block' : 'none';
+}
+
+function triggerFlash() {
+  if (!flash) return;
+
+  flash.style.opacity = '1';
+
+  setTimeout(() => {
+    flash.style.opacity = '0';
+  }, 95);
+}
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
+function refreshGui() {
+  if (!gui || typeof gui.controllersRecursive !== 'function') return;
+
+  gui.controllersRecursive().forEach((controller) => {
+    controller.updateDisplay();
+  });
 }
 
 function onResize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
+
   renderer.setSize(width, height, false);
+  composer.setSize(width, height);
+
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
 }
 
+function renderFrame() {
+  if (photoPass) {
+    photoPass.uniforms.uTime.value = clock.elapsedTime;
+  }
+
+  composer.render();
+}
+
 function animate() {
   requestAnimationFrame(animate);
+
   const delta = clock.getDelta();
+
   planetMesh.rotation.y += delta * params.surfaceSpeed;
-  stars.rotation.y += delta * params.starMotion;
+
+  if (stars) {
+    stars.rotation.y += delta * params.starMotion;
+    stars.rotation.x += delta * params.starMotion * 0.22;
+  }
+
   controls.update();
-  renderer.render(scene, camera);
+  renderFrame();
 }
