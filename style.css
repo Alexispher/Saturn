@@ -1,0 +1,33 @@
+/* style.css */
+:root {
+    /* Valores iniciais (controlados pelo JS) */
+    --light-pos-x: 32%;
+    --light-pos-y: 32%;
+    --planet-rot: -13deg;
+    --pm-contrast: 1.12;
+    --pm-brightness: 0.58;
+}
+
+#saturn {
+    /* Aplica os filtros da câmera do Modo Foto */
+    filter: grayscale(1) contrast(var(--pm-contrast)) brightness(var(--pm-brightness));
+    transform: translateY(-50%) rotateZ(var(--planet-rot));
+    transition: transform 0.1s ease-out, filter 0.1s ease-out;
+}
+
+#saturn .planet-bg {
+    /* A luz reage à posição X e Y definida pelo usuário */
+    background: radial-gradient(
+        circle at var(--light-pos-x) var(--light-pos-y),
+        rgba(255,255,255,0.74) 0%,
+        rgba(220,220,220,0.58) 12%,
+        rgba(135,135,135,0.48) 31%,
+        rgba(58,58,58,0.84) 60%,
+        rgba(0,0,0,1) 100%
+    );
+    
+    /* Sombra fixa para dar volume esférico constante */
+    box-shadow: 
+        inset -70px -32px 90px rgba(0,0,0,0.92),
+        inset 36px 20px 52px rgba(255,255,255,0.08);
+}
