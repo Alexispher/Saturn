@@ -38,6 +38,13 @@ const params = {
   cloudSpeed: 0.0,
   showHexagonHint: true,
 
+  // Luz
+lightX: 8.5,
+lightY: 4.0,
+lightZ: 10.5,
+lightIntensity: 2.55,
+ambientIntensity: 0.0,
+
   // Atmosfera / rim scattering
   atmosphereGlow: 0.34,
   atmospherePower: 2.7,
